@@ -6,6 +6,7 @@ from typing import TypedDict
 from benchmark.config import ModelEntry
 from benchmark.exceptions import FatalBenchmarkError
 from benchmark.providers.openrouter import openrouter_generate_response
+from benchmark.providers.vertexai_batch import VertexAIBatchProvider
 from benchmark.providers import (
     AnthropicBatchProvider,
     GeminiBatchProvider,
@@ -132,7 +133,7 @@ PROVIDERS: dict[str, ProviderConfig] = {
     # Location can be specified in api_params using the "location" key
     "vertexai_oss": {
         "generate_fn": vertexai_generate,
-        "batch_provider_class": None,
+        "batch_provider_class": VertexAIBatchProvider,
     },
     # gemini provider using Google AI Studio / Gemini API directly (not Vertex AI)
     # Supports both sequential and batch generation (50% discount on batch)
@@ -145,6 +146,6 @@ PROVIDERS: dict[str, ProviderConfig] = {
     # alias: "vertexai" → "vertexai_oss" for convenience
     "vertexai": {
         "generate_fn": vertexai_generate,
-        "batch_provider_class": None,
+        "batch_provider_class": VertexAIBatchProvider,
     },
 }

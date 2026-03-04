@@ -3,7 +3,7 @@
       {
         "name": "google/gemini-2.5-flash",
         "provider": "vertexai",
-        "mode": "sequential",
+        "mode": "batch",
         "api_params": {
           "location": "global",
           "temperature": 0.2,
