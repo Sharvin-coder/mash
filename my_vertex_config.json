@@ -1,19 +1,20 @@
 {
-    "models": [
-      {
-        "name": "google/gemini-2.5-flash",
-        "provider": "vertexai",
-        "mode": "batch",
-        "api_params": {
-          "location": "global",
-          "temperature": 0.2,
-          "max_output_tokens": 1024
-        }
+  "models": [
+    {
+      "name": "meta/llama-3.3-70b-instruct-maas",
+      "provider": "vertexai",
+      "mode": "sequential",
+      "api_params": {
+        "location": "us-central1",
+        "temperature": 0.2,
+        "max_output_tokens": 1024
       }
-    ],
-    "judge_provider": "vertexai",
-    "input": "benchmark_samples/cross_domain.jsonl",
-    "output": "outputs/vertex_test.json",
-    "concurrency": 1,
-    "limit": 5
+    }
+  ],
+  "judge_model": "qwen/qwen3-235b-a22b-instruct-2507-maas",
+  "judge_provider": "vertexai",
+  "input": "benchmark_samples/cross_domain.jsonl",
+  "output": "outputs/vertex_test.json",
+  "concurrency": 1,
+  "limit": 5
 }
