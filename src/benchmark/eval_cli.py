@@ -3,8 +3,15 @@
 
 import argparse
 import asyncio
+import os
 import sys
 import textwrap
+from pathlib import Path
+
+os.environ.setdefault(
+    "VERTEXAI_SERVICE_ACCOUNT_PATH",
+    str(Path.home() / "Downloads" / "VERTEXAI_SERVICE_ACCOUNT.json"),
+)
 
 from benchmark.benchmark_runner import (
     cancel_batch_jobs,
