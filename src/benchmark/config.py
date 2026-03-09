@@ -115,6 +115,7 @@ class BenchmarkConfig(BaseModel):
     dataset: str = "persistbench"
     memory_mode: str = "full_profile"
     cim_path: str | None = None
+    cim_labels_file: str | None = None
     cim_judge_variant: str = "reveal_paper_compat"
 
     # Model overrides

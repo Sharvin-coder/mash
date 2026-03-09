@@ -150,14 +150,14 @@ def get_generation_status(
     has_response = bool(memory_response)
 
     # Check if completed (has responses, judge, and no error)
-    if (
-        has_response
-        and not error
-        and judge is not None
-        and judge.get("score") is not None
-        and judge.get("reasoning")
-    ):
-        return GenerationStatus.COMPLETED
+    # PersistBench judge has "score" + "reasoning"; CIM judge has "violation_rate" + "completeness_rate"
+    if has_response and not error and judge is not None:
+        is_persistbench_judge = (
+            judge.get("score") is not None and judge.get("reasoning")
+        )
+        is_cim_judge = "violation_rate" in judge and "completeness_rate" in judge
+        if is_persistbench_judge or is_cim_judge:
+            return GenerationStatus.COMPLETED
 
     if not has_response:
         return GenerationStatus.NEEDS_GENERATION
@@ -184,14 +184,12 @@ def _has_completed_generation(result_data: dict[str, Any]) -> bool:
         memory_response = gen.get("memory_response")
 
         # A generation is completed if it has a response, no error, and valid judge
-        if (
-            memory_response
-            and not error
-            and judge is not None
-            and judge.get("score") is not None
-            and judge.get("reasoning")
-        ):
-            return True
+        # PersistBench judge has "score" + "reasoning"; CIM judge has "violation_rate" + "completeness_rate"
+        if memory_response and not error and judge is not None:
+            is_persistbench = judge.get("score") is not None and judge.get("reasoning")
+            is_cim = "violation_rate" in judge and "completeness_rate" in judge
+            if is_persistbench or is_cim:
+                return True
     return False
 
 

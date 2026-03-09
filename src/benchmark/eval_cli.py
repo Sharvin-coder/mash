@@ -87,10 +87,23 @@ def _add_arguments(parser: argparse.ArgumentParser) -> None:
         help="HuggingFace dataset ID or local path for CIM dataset",
     )
     parser.add_argument(
+        "--cim-labels",
+        default=None,
+        help="Path to pre-computed CIM labels file (from `benchmark cim-label`)",
+    )
+    parser.add_argument(
         "--cim-judge-variant",
         choices=["default", "reveal_paper_compat", "reveal_official"],
         default=None,
         help="CIM judge variant: 'default' (legacy), 'reveal_paper_compat' (REVEAL metric), or 'reveal_official' (official CIMemories REVEAL). Default: reveal_paper_compat",
+    )
+    parser.add_argument(
+        "--auto-label",
+        action="store_true",
+        default=False,
+        help="Automatically generate CIM labels (via cim-label) before running the benchmark "
+        "if no --cim-labels file is provided or the file doesn't exist. "
+        "Enables a single-command CIM benchmark run.",
     )
     parser.add_argument(
         "--generator-model",
@@ -128,6 +141,40 @@ async def _handle(args: argparse.Namespace) -> int:
     skip_generation = subcommand == "judge"
     skip_judge = subcommand == "generate"
 
+    # Auto-label: generate CIM labels if needed before running the benchmark
+    cim_labels = args.cim_labels
+    effective_dataset = args.dataset
+    if effective_dataset is None:
+        # Check config file for dataset setting
+        from pathlib import Path as _Path
+        import orjson
+        _cfg_path = _Path(args.file)
+        if _cfg_path.exists():
+            try:
+                _cfg_data = orjson.loads(_cfg_path.read_bytes())
+                if isinstance(_cfg_data, dict) and "entries" not in _cfg_data:
+                    effective_dataset = _cfg_data.get("dataset", "persistbench")
+            except Exception:
+                pass
+
+    is_cim = effective_dataset in ("cim", "both")
+    if is_cim and args.auto_label and not cim_labels:
+        from pathlib import Path as _Path
+        from benchmark.datasets.cim_labeler import LabelingConfig, run_labeling
+
+        default_labels_path = _Path("outputs/cim_labels.json")
+        if not default_labels_path.exists():
+            print("\n--- Auto-labeling CIM attributes ---")
+            label_config = LabelingConfig(
+                dataset_id=args.cim_path or "facebook/CIMemories",
+            )
+            labels_path = await run_labeling(label_config)
+            cim_labels = str(labels_path)
+            print(f"--- Auto-labeling complete: {labels_path} ---\n")
+        else:
+            print(f"Using existing labels file: {default_labels_path}")
+            cim_labels = str(default_labels_path)
+
     stats = await run_benchmark_with_retry(
         file_path=args.file,
         dry_run=args.dry_run,
@@ -143,6 +190,7 @@ async def _handle(args: argparse.Namespace) -> int:
         dataset=args.dataset,
         memory_mode=args.memory_mode,
         cim_path=args.cim_path,
+        cim_labels=cim_labels,
         cim_judge_variant=args.cim_judge_variant,
         generator_model=args.generator_model,
         judge_model=args.judge_model,
@@ -200,6 +248,57 @@ async def main_async() -> int:
     )
     _add_arguments(judge_parser)
 
+    cim_label_parser = subparsers.add_parser(
+        "cim-label",
+        help="Generate persona-based labels for CIMemories dataset",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent("""
+            Generates share/private labels for CIMemories attributes using
+            Westin privacy personas (fundamentalist, pragmatic, unconcerned).
+
+            Example:
+              benchmark cim-label
+              benchmark cim-label --model google/gemini-2.5-flash --concurrency 20
+              benchmark cim-label --aggregate-only
+        """),
+    )
+    cim_label_parser.add_argument(
+        "--model", default="google/gemini-2.5-flash",
+        help="Model for labeling (default: google/gemini-2.5-flash)",
+    )
+    cim_label_parser.add_argument(
+        "--provider", choices=["openrouter", "gemini", "vertexai_oss", "vertexai"], default="openrouter",
+        help="Provider for labeling model (default: openrouter)",
+    )
+    cim_label_parser.add_argument(
+        "--concurrency", type=int, default=10,
+        help="Concurrent API calls (default: 10)",
+    )
+    cim_label_parser.add_argument(
+        "--samples", type=int, default=10,
+        help="Samples per persona (default: 10)",
+    )
+    cim_label_parser.add_argument(
+        "--output", default="outputs/cim_labels.json",
+        help="Output labels file path",
+    )
+    cim_label_parser.add_argument(
+        "--checkpoint", default="outputs/cim_labeling_checkpoint.json",
+        help="Checkpoint file for resuming labeling",
+    )
+    cim_label_parser.add_argument(
+        "--dataset-id", default="facebook/CIMemories",
+        help="HuggingFace dataset ID",
+    )
+    cim_label_parser.add_argument(
+        "--aggregate-only", action="store_true",
+        help="Skip LLM calls, just aggregate existing checkpoint into labels",
+    )
+    cim_label_parser.add_argument(
+        "--temperature", type=float, default=0.7,
+        help="Temperature for labeling calls (default: 0.7)",
+    )
+
     cim_metrics_parser = subparsers.add_parser(
         "cim-metrics",
         help="Compute aggregate CIM metrics (violation + coverage) from checkpoint",
@@ -227,6 +326,31 @@ async def main_async() -> int:
 
     if args.subcommand == "cim-metrics":
         run_cim_metrics_cli(args.file, model_name=args.model)
+        return 0
+
+    if args.subcommand == "cim-label":
+        from pathlib import Path
+        from benchmark.datasets.cim_labeler import LabelingConfig, run_labeling, load_cim_groups, aggregate_labels, save_labels, _load_checkpoint
+
+        config = LabelingConfig(
+            dataset_id=args.dataset_id,
+            model_name=args.model,
+            provider=args.provider,
+            samples_per_persona=args.samples,
+            concurrency=args.concurrency,
+            temperature=args.temperature,
+            checkpoint_path=Path(args.checkpoint),
+            output_path=Path(args.output),
+        )
+
+        if args.aggregate_only:
+            print("Aggregate-only mode: loading checkpoint and groups...")
+            groups = load_cim_groups(config.dataset_id, config.split)
+            checkpoint = _load_checkpoint(config.checkpoint_path)
+            labels = aggregate_labels(checkpoint, groups)
+            save_labels(labels, config.output_path, config)
+        else:
+            await run_labeling(config)
         return 0
 
     return await _handle(args)

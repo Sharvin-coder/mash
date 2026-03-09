@@ -199,6 +199,7 @@ def _load_cim_entries(config: BenchmarkConfig) -> list[InputEntry]:
     cim_dataset = CIMDataset(
         dataset_id=dataset_id,
         memory_mode=config.memory_mode,
+        labels_file=config.cim_labels_file,
     )
     samples = list(cim_dataset)
     print(f"Loaded {len(samples)} samples from CIM dataset ({dataset_id})")
@@ -273,6 +274,7 @@ async def run_benchmark(
     dataset: str | None = None,
     memory_mode: str | None = None,
     cim_path: str | None = None,
+    cim_labels: str | None = None,
     cim_judge_variant: str | None = None,
     generator_model: str | None = None,
     judge_model: str | None = None,
@@ -312,6 +314,8 @@ async def run_benchmark(
             pre_config.memory_mode = memory_mode
         if cim_path is not None:
             pre_config.cim_path = cim_path
+        if cim_labels is not None:
+            pre_config.cim_labels_file = cim_labels
         if cim_judge_variant is not None:
             pre_config.cim_judge_variant = cim_judge_variant
         if generator_model is not None:
@@ -473,6 +477,7 @@ async def run_benchmark_with_retry(
     dataset: str | None = None,
     memory_mode: str | None = None,
     cim_path: str | None = None,
+    cim_labels: str | None = None,
     cim_judge_variant: str | None = None,
     generator_model: str | None = None,
     judge_model: str | None = None,
@@ -500,6 +505,7 @@ async def run_benchmark_with_retry(
         dataset=dataset,
         memory_mode=memory_mode,
         cim_path=cim_path,
+        cim_labels=cim_labels,
         cim_judge_variant=cim_judge_variant,
         generator_model=generator_model,
         judge_model=judge_model,
