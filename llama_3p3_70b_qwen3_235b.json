@@ -24,7 +24,7 @@
   "judge_model": "moonshotai/kimi-k2-thinking-maas",
   "judge_provider": "vertexai",
   "input": "benchmark_samples/cross_domain.jsonl",
-  "output": "outputs/vertex_test.json",
+  "output": "outputs/persist_full_llama3p3_70b_qwen3_235b.json",
   "concurrency": 1,
   "limit": 5
 }
