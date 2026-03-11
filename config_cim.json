@@ -3,6 +3,7 @@
   "output": "outputs/llama_cim_output.json",
   "dataset": "cim",
   "memory_mode": "full_profile",
+  "cim_labels_file": "outputs/cim_labels.json",
   "concurrency": 5,
   "models": [
     {
