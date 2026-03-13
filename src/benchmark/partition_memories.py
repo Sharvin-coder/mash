@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Partition the 'memories' field in full_benchmark.jsonl into 9 categories.
+"""Partition the 'memories' field in full_benchmark.jsonl into 11 categories.
 
-Each sample's flat list of memories is replaced with a dict of 9 category keys,
+Each sample's flat list of memories is replaced with a dict of 11 category keys,
 with all other sample fields (query, memory_domain, query_domain, failure_type, …)
 preserved exactly as-is.
 
@@ -9,8 +9,10 @@ Output is written incrementally so the script is safe to interrupt and resume.
 
 ─── HOW TO EDIT ───────────────────────────────────────────────────────────────
   • Change the model / location / temperature  →  MODEL block below
-  • Change what the LLM is told to do          →  SYSTEM_PROMPT below
+  • Change input/output paths                  →  RUN CONFIG below
+  • Change the dataset you want to partition   →  RUN CONFIG below
   • Change concurrency or retry behaviour      →  RUN_CONFIG below
+  • Change what the LLM is told to do          →  SYSTEM_PROMPT below
 ───────────────────────────────────────────────────────────────────────────────
 """
 
@@ -30,6 +32,14 @@ os.environ.setdefault(
 MODEL_NAME     = "qwen/qwen3-235b-a22b-instruct-2507-maas"
 MODEL_LOCATION = "global"   # VertexAI region where the model is deployed
 TEMPERATURE    = 0
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ── RUN CONFIG ────────────────────────────────────────────────────────────────
+CONCURRENCY  = 7     # max simultaneous API requests
+MAX_RETRIES  = 5     # retry attempts per sample on parse / API failure
+_PROJECT_ROOT = Path(__file__).parent.parent.parent
+INPUT_FILE   = _PROJECT_ROOT / "benchmark_samples/full_benchmark.jsonl"
+OUTPUT_FILE  = _PROJECT_ROOT / "benchmark_samples/partitioned/qwen3_235b/full_benchmark.jsonl"
 # ──────────────────────────────────────────────────────────────────────────────
 
 # ── PROMPT ────────────────────────────────────────────────────────────────────
@@ -76,18 +86,45 @@ Return ONLY a single-line JSON object with the following keys in this exact orde
 """
 # ──────────────────────────────────────────────────────────────────────────────
 
-# ── RUN CONFIG ────────────────────────────────────────────────────────────────
-CONCURRENCY  = 10    # max simultaneous API requests
-MAX_RETRIES  = 3     # retry attempts per sample on parse / API failure
-_PROJECT_ROOT = Path(__file__).parent.parent.parent
-INPUT_FILE   = _PROJECT_ROOT / "benchmark_samples/beneficial_samples.jsonl"
-OUTPUT_FILE  = _PROJECT_ROOT / "benchmark_samples/partitioned/beneficial_samples_qwen3_235b.jsonl"
-# ──────────────────────────────────────────────────────────────────────────────
-
 
 # ── Internals (no need to edit below) ─────────────────────────────────────────
 
-from benchmark.utils import extract_json_from_response, get_vertex_ai_client  # noqa: E402
+import sys  # noqa: E402
+sys.path.insert(0, str(Path(__file__).parent.parent))  # add src/ so 'benchmark' is importable
+
+from benchmark.utils import extract_json_from_response, generate_hash_id, get_vertex_ai_client  # noqa: E402
+
+
+PARTITION_MAP = {
+    "cross_domain":            "cross_domain.jsonl",
+    "sycophancy":              "sycophancy.jsonl",
+    "beneficial_memory_usage": "beneficial_samples.jsonl",
+}
+
+
+def _write_partitions() -> None:
+    """Read the completed OUTPUT_FILE and split it into 3 files by failure_type."""
+    out_dir = OUTPUT_FILE.parent
+    partitions: dict[str, list[str]] = {key: [] for key in PARTITION_MAP}
+
+    with open(OUTPUT_FILE) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            sample = json.loads(line)
+            ft = sample.get("failure_type", "")
+            if ft in partitions:
+                partitions[ft].append(line)
+
+    for failure_type, filename in PARTITION_MAP.items():
+        out_path = out_dir / filename
+        lines = partitions[failure_type]
+        with open(out_path, "w") as f:
+            f.write("\n".join(lines))
+            if lines:
+                f.write("\n")
+        print(f"Wrote {len(lines):>3} samples [{failure_type}] → {out_path}")
 
 
 def _load_checkpoint() -> set[str]:
@@ -178,13 +215,19 @@ async def _process_sample(
 ) -> None:
     memories: list[str] = sample.get("memories", [])
 
+    # Compute hash from the original flat memories BEFORE partitioning.
+    # This stable hash matches what the benchmark runner computes for the same
+    # sample from the unpartitioned full_benchmark.jsonl, so all models share
+    # one canonical hash_id regardless of how their memories are categorised.
+    hash_id = sample.get("hash_id") or generate_hash_id(memories, sample["query"])
+
     if memories:
         partition = await _classify(client, memories, semaphore)
     else:
         partition = {cat: [] for cat in CATEGORIES}
 
-    # Preserve every original field; only replace 'memories'
-    result = {**sample, "memories": partition}
+    # Preserve every original field; replace 'memories' with partition and pin hash_id.
+    result = {**sample, "hash_id": hash_id, "memories": partition}
 
     async with lock:
         out_file.write(json.dumps(result, ensure_ascii=False) + "\n")
@@ -211,7 +254,8 @@ async def main() -> None:
     print(f"Already done: {len(done_queries)} | Remaining: {len(pending)}")
 
     if not pending:
-        print("All samples already processed. Nothing to do.")
+        print("All samples already processed. Writing partitions from existing output…")
+        _write_partitions()
         return
 
     semaphore = asyncio.Semaphore(CONCURRENCY)
@@ -229,6 +273,8 @@ async def main() -> None:
             await asyncio.gather(*tasks)
 
     print(f"\nDone! Saved to {OUTPUT_FILE}")
+    print("Writing partition files…")
+    _write_partitions()
 
 
 if __name__ == "__main__":
