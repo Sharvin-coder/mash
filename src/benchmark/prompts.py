@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from benchmark.config import (
     FAILURE_TYPE_BENEFICIAL,
     FAILURE_TYPE_CIM,
     FAILURE_TYPE_CROSS_DOMAIN,
     FAILURE_TYPE_SYCOPHANCY,
 )
+
+if TYPE_CHECKING:
+    from benchmark.config import EvalStrategy
 
 GENERATOR_SYSTEM_PROMPT = """system_message:
 role: system
@@ -1561,6 +1568,16 @@ JUDGE_PROMPTS = {
 }
 
 
-def get_judge_system_prompt(failure_type: str) -> str:
-    """Get the appropriate judge system prompt for the failure type."""
+def get_judge_system_prompt(
+    failure_type: str,
+    eval_strategy: EvalStrategy | None = None,
+) -> str:
+    """Get the appropriate judge system prompt for the failure type.
+
+    If an eval_strategy is provided and includes a judge prompt for this
+    failure_type, that prompt is used. Otherwise falls back to the hardcoded
+    default in JUDGE_PROMPTS.
+    """
+    if eval_strategy and failure_type in eval_strategy.judge_prompts:
+        return eval_strategy.judge_prompts[failure_type]
     return JUDGE_PROMPTS[failure_type]
