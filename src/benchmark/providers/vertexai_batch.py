@@ -248,9 +248,11 @@ class VertexAIBatchProvider:
             )
 
             job = aiplatform.BatchPredictionJob.submit(
-                source_model=publisher_model,
-                input_dataset=input_uri,
-                output_uri_prefix=output_prefix,
+                model_name=publisher_model,
+                instances_format="jsonl",
+                predictions_format="jsonl",
+                gcs_source=input_uri,
+                gcs_destination_prefix=output_prefix,
                 project=project_id,
                 location=location,
                 credentials=credentials,

@@ -64,6 +64,17 @@ class GenerationTask:
     def hash_id(self) -> str:
         return self.entry["hash_id"]
 
+    @property
+    def memories(self) -> list[str]:
+        """Return the memories to use for this model's generation.
+
+        In partitioned mode each model has its own categorised memories stored
+        under entry["model_memories"][model_name].  For every other mode the
+        shared entry["memories"] flat list is used.
+        """
+        model_memories: dict = self.entry.get("model_memories", {})
+        return model_memories.get(self.model.name) or self.entry["memories"]
+
 
 @dataclass(slots=True)
 class GenerationResult:
@@ -224,7 +235,7 @@ async def _process_generation_task(
             task.model,
             generate_fn,
             task.entry["query"],
-            task.entry["memories"],
+            task.memories,
             prompt_template,
         )
 
@@ -490,11 +501,11 @@ def _prepare_generation_batch_items(
     for task in tasks:
         if prompt_template:
             generation_prompt = build_generation_prompt(
-                task.entry["memories"], task.model.name, prompt_template
+                task.memories, task.model.name, prompt_template
             )
         else:
             generation_prompt = build_generation_prompt(
-                task.entry["memories"], task.model.name
+                task.memories, task.model.name
             )
 
         single_item: BatchWorkItem = {

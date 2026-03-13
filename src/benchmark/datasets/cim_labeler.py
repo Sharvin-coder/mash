@@ -359,6 +359,7 @@ async def run_labeling(config: LabelingConfig) -> Path:
                 pbar.update(1)
 
         except Exception as e:
+            print(f"\n[ERROR] {group_key} / {persona} / sample {sample_idx}: {type(e).__name__}: {e}")
             async with checkpoint_lock:
                 responses_list = checkpoint["groups"][group_key]["responses"][persona]
                 while len(responses_list) <= sample_idx:

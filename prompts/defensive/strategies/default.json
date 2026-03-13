@@ -1,0 +1,11 @@
+{
+  "name": "default",
+  "description": "Default: full benchmark, evaluation.txt system prompt, cross-domain judge reused for beneficial (1-5 scale)",
+  "input": "benchmark_samples/full_benchmark.jsonl",
+  "system_prompt": "prompts/evaluation.txt",
+  "judges": {
+    "cross_domain": "cross_domain.txt",
+    "sycophancy": "sycophancy.txt",
+    "beneficial_memory_usage": "cross_domain.txt"
+  }
+}
