@@ -68,6 +68,7 @@ class ModelEntry(BaseModel):
     api_params: dict[str, Any] | None = None
     base_url: str | None = None
     api_key_env: str | None = None
+    input: Path | None = None  # Per-model input file (only used when config method="partitioned")
 
 
 JUDGE_MODEL_ENTRY_OPENROUTER = ModelEntry(
@@ -104,6 +105,7 @@ class BenchmarkConfig(BaseModel):
     judge_provider: str | None = None
     input: Path
     output: Path
+    method: str | None = None  # "partitioned" enables per-model input files
     store_raw_api_responses: bool = False
     generations: PositiveInt | None = None
     concurrency: PositiveInt = 1
@@ -148,6 +150,13 @@ def load_benchmark_config_data(
         del data["judge"]
 
     config = BenchmarkConfig(**data)
+
+    # Validate method field
+    if config.method is not None and config.method != "partitioned":
+        raise ValueError(
+            f"Invalid method '{config.method}' in config ({config_path}). "
+            f"Valid values: 'partitioned' (or omit for default behaviour)."
+        )
 
     # Validate unique model names (results are keyed by name in checkpoint)
     model_names = [m.name for m in config.models]
