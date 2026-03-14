@@ -29,7 +29,7 @@ os.environ.setdefault(
 )
 
 # ── MODEL ─────────────────────────────────────────────────────────────────────
-MODEL_NAME     = "qwen/qwen3-235b-a22b-instruct-2507-maas"
+MODEL_NAME     = "google/gemini-3-pro-preview"
 MODEL_LOCATION = "global"   # VertexAI region where the model is deployed
 TEMPERATURE    = 0
 # ──────────────────────────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ CONCURRENCY  = 7     # max simultaneous API requests
 MAX_RETRIES  = 5     # retry attempts per sample on parse / API failure
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 INPUT_FILE   = _PROJECT_ROOT / "benchmark_samples/full_benchmark.jsonl"
-OUTPUT_FILE  = _PROJECT_ROOT / "benchmark_samples/partitioned/qwen3_235b/full_benchmark.jsonl"
+OUTPUT_FILE  = _PROJECT_ROOT / "benchmark_samples/partitioned/gemini3_pro/full_benchmark.jsonl"
 # ──────────────────────────────────────────────────────────────────────────────
 
 # ── PROMPT ────────────────────────────────────────────────────────────────────
