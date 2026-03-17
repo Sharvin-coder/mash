@@ -1,0 +1,14 @@
+{
+  "input": "benchmark_samples/full_benchmark.jsonl",
+  "output": "outputs/llama_both_output.json",
+  "dataset": "both",
+  "memory_mode": "full_profile",
+  "concurrency": 5,
+  "models": [
+    {
+      "name": "meta-llama/llama-3.3-70b-instruct",
+      "provider": "openrouter",
+      "mode": "sequential"
+    }
+  ]
+}

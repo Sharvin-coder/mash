@@ -128,13 +128,6 @@ def _add_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="Provider for generator/judge models (default: openrouter)",
     )
-    parser.add_argument(
-        "--eval-strategy",
-        default=None,
-        help="Evaluation strategy name (from prompts/defensive/strategies/). "
-        "Controls input data, system prompt, and judge prompts. "
-        "Use 'benchmark strategies' to list available options.",
-    )
 
 
 def _exit_code_for_subcommand(stats, *, subcommand: str) -> int:
@@ -209,7 +202,6 @@ async def _handle(args: argparse.Namespace) -> int:
         generator_model=args.generator_model,
         judge_model=args.judge_model,
         provider=args.provider,
-        eval_strategy=args.eval_strategy,
     )
     return _exit_code_for_subcommand(stats, subcommand=subcommand)
 
@@ -337,32 +329,7 @@ async def main_async() -> int:
         help="Filter results to a specific model name",
     )
 
-    subparsers.add_parser(
-        "strategies",
-        help="List available evaluation strategies",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=textwrap.dedent("""
-            Lists all evaluation strategies found in prompts/defensive/strategies/.
-            Each strategy defines: input data, system prompt, and judge prompts.
-
-            Example:
-              benchmark strategies
-        """),
-    )
-
     args = parser.parse_args()
-
-    if args.subcommand == "strategies":
-        from benchmark.config import list_eval_strategies
-        strategies = list_eval_strategies()
-        if not strategies:
-            print("No evaluation strategies found in prompts/defensive/strategies/")
-            return 0
-        print("Available evaluation strategies:\n")
-        for s in strategies:
-            print(f"  {s['name']:<30} {s['description']}")
-        print(f"\nUsage: benchmark run config.json --eval-strategy <name>")
-        return 0
 
     if args.subcommand == "cim-metrics":
         run_cim_metrics_cli(args.file, model_name=args.model)

@@ -1,10 +1,7 @@
 """Configuration loading and validation."""
 
-from __future__ import annotations
-
 import json
 import warnings
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -61,106 +58,6 @@ BENCHMARK_SEED = 42
 
 VALID_JUDGE_PROVIDERS = {"vertexai", "openrouter", "gemini"}
 
-# ── Evaluation strategy ──────────────────────────────────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-STRATEGIES_DIR = PROJECT_ROOT / "prompts" / "defensive" / "strategies"
-JUDGES_DIR = PROJECT_ROOT / "prompts" / "judges"
-
-
-@dataclass
-class EvalStrategy:
-    """Loaded evaluation strategy — routes input, system prompt, and judges."""
-
-    name: str
-    description: str
-    input_file: Path
-    system_prompt_path: Path
-    system_prompt_content: str
-    judge_prompts: dict[str, str] = field(default_factory=dict)
-
-
-def list_eval_strategies(strategies_dir: Path = STRATEGIES_DIR) -> list[dict[str, str]]:
-    """List available evaluation strategies from prompts/defensive/strategies/."""
-    results = []
-    if not strategies_dir.exists():
-        return results
-    for path in sorted(strategies_dir.glob("*.json")):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            results.append({
-                "name": data.get("name", path.stem),
-                "description": data.get("description", ""),
-            })
-        except (json.JSONDecodeError, KeyError):
-            continue
-    return results
-
-
-def load_eval_strategy(
-    name: str,
-    strategies_dir: Path = STRATEGIES_DIR,
-    judges_dir: Path = JUDGES_DIR,
-) -> EvalStrategy:
-    """Load an evaluation strategy by name.
-
-    Reads the strategy JSON and resolves all file references:
-    - ``input`` → JSONL path (relative to project root)
-    - ``system_prompt`` → prompt template path (relative to project root)
-    - ``judges.<failure_type>`` → judge prompt filename (resolved from judges_dir)
-
-    For failure types not listed in the manifest, the caller falls back to the
-    hardcoded defaults in prompts.py.
-    """
-    strategy_path = strategies_dir / f"{name}.json"
-    if not strategy_path.exists():
-        available = [s["name"] for s in list_eval_strategies(strategies_dir)]
-        raise ValueError(
-            f"Evaluation strategy '{name}' not found at {strategy_path}. "
-            f"Available strategies: {available}"
-        )
-
-    data = json.loads(strategy_path.read_text(encoding="utf-8"))
-
-    # Resolve input file
-    input_file = PROJECT_ROOT / data["input"]
-    if not input_file.exists():
-        raise ValueError(
-            f"Strategy '{name}': input file '{data['input']}' not found at {input_file}"
-        )
-
-    # Resolve system prompt
-    system_prompt_path = PROJECT_ROOT / data["system_prompt"]
-    if not system_prompt_path.exists():
-        raise ValueError(
-            f"Strategy '{name}': system_prompt '{data['system_prompt']}' "
-            f"not found at {system_prompt_path}"
-        )
-    system_prompt_content = system_prompt_path.read_text(encoding="utf-8")
-
-    if "{memories}" not in system_prompt_content:
-        raise ValueError(
-            f"Strategy '{name}': system prompt must contain the {{memories}} placeholder."
-        )
-
-    # Resolve judge prompts (filenames relative to judges_dir)
-    judge_prompts: dict[str, str] = {}
-    for failure_type, judge_filename in data.get("judges", {}).items():
-        judge_path = judges_dir / judge_filename
-        if not judge_path.exists():
-            raise ValueError(
-                f"Strategy '{name}': judge file '{judge_filename}' for "
-                f"'{failure_type}' not found at {judge_path}"
-            )
-        judge_prompts[failure_type] = judge_path.read_text(encoding="utf-8")
-
-    return EvalStrategy(
-        name=data.get("name", name),
-        description=data.get("description", ""),
-        input_file=input_file,
-        system_prompt_path=system_prompt_path,
-        system_prompt_content=system_prompt_content,
-        judge_prompts=judge_prompts,
-    )
 
 
 class ModelEntry(BaseModel):
@@ -226,9 +123,6 @@ class BenchmarkConfig(BaseModel):
     generator_model: str | None = None
     judge_model_name: str | None = None
     provider: str = "openrouter"
-
-    # Evaluation strategy (name of a .json file in prompts/defensive/strategies/)
-    eval_strategy: str | None = None
 
     # Loaded template content (not part of JSON schema)
     prompt_template_content: str | None = None

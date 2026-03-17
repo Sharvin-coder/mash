@@ -17,7 +17,6 @@ from benchmark.config import (
     BenchmarkConfig,
     get_generations_for_failure_type,
     load_benchmark_config_data,
-    load_eval_strategy,
 )
 from benchmark.dry_run import run_dry_run
 from benchmark.exceptions import FatalBenchmarkError
@@ -38,7 +37,6 @@ from benchmark.execution.judgment import (
     build_judgment_tasks,
     get_judge_provider,
     set_cim_judge_variant,
-    set_eval_strategy,
     set_judge_model,
     set_judge_provider,
 )
@@ -281,7 +279,6 @@ async def run_benchmark(
     generator_model: str | None = None,
     judge_model: str | None = None,
     provider: str | None = None,
-    eval_strategy: str | None = None,
 ) -> BenchmarkStats:
     """Run benchmark workflow from a config file or checkpoint file.
 
@@ -325,19 +322,6 @@ async def run_benchmark(
             pre_config.generator_model = generator_model
         if provider is not None:
             pre_config.provider = provider
-
-        # Apply eval strategy: overrides input, system prompt, and judge routing
-        effective_strategy_name = eval_strategy or pre_config.eval_strategy
-        if effective_strategy_name:
-            strategy = load_eval_strategy(effective_strategy_name)
-            pre_config.input = strategy.input_file
-            pre_config.prompt_template = strategy.system_prompt_path
-            pre_config.prompt_template_content = strategy.system_prompt_content
-            pre_config.eval_strategy = strategy.name
-            set_eval_strategy(strategy)
-            print(f"Evaluation strategy: {strategy.name} — {strategy.description}")
-        else:
-            set_eval_strategy(None)
 
     entries, config, is_fresh_config, existing_checkpoint = _load_from_file(
         path, limit=limit, dataset_override=dataset, config=pre_config
@@ -498,7 +482,6 @@ async def run_benchmark_with_retry(
     generator_model: str | None = None,
     judge_model: str | None = None,
     provider: str | None = None,
-    eval_strategy: str | None = None,
 ) -> BenchmarkStats:
     """Run benchmark with optional run-level retry on failures.
 
@@ -527,7 +510,6 @@ async def run_benchmark_with_retry(
         generator_model=generator_model,
         judge_model=judge_model,
         provider=provider,
-        eval_strategy=eval_strategy,
     )
 
     if not retry_enabled:

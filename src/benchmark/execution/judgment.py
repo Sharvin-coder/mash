@@ -25,7 +25,6 @@ from benchmark.checkpoint import (
 )
 from benchmark.config import (
     BenchmarkConfig,
-    EvalStrategy,
     FAILURE_TYPE_CIM,
     JUDGE_MODEL,
     JUDGE_MODEL_GEMINI,
@@ -61,8 +60,6 @@ _runtime_judge_provider: str | None = None
 _runtime_judge_model: str | None = None
 # Runtime CIM judge variant (set via set_cim_judge_variant)
 _runtime_cim_judge_variant: str | None = None
-# Runtime evaluation strategy (set via set_eval_strategy)
-_runtime_eval_strategy: EvalStrategy | None = None
 
 
 def set_judge_provider(provider: str | None) -> None:
@@ -109,27 +106,14 @@ def get_cim_judge_variant() -> str:
     return "reveal_paper_compat"
 
 
-def set_eval_strategy(strategy: EvalStrategy | None) -> None:
-    """Set runtime evaluation strategy."""
-    global _runtime_eval_strategy
-    _runtime_eval_strategy = strategy
-
-
-def get_eval_strategy() -> EvalStrategy | None:
-    """Get current evaluation strategy (None = use hardcoded defaults)."""
-    return _runtime_eval_strategy
-
-
 __all__ = [
     "SequentialJudgmentExecutor",
     "build_judgment_tasks",
     "evaluate_with_judge",
     "get_cim_judge_variant",
-    "get_eval_strategy",
     "get_judge_provider",
     "judge_response",
     "set_cim_judge_variant",
-    "set_eval_strategy",
     "set_judge_model",
     "set_judge_provider",
 ]
@@ -583,7 +567,7 @@ async def evaluate_with_judge(
                 memory_response=memory_response,
             )
     else:
-        judge_system_prompt = get_judge_system_prompt(failure_type, eval_strategy=get_eval_strategy())
+        judge_system_prompt = get_judge_system_prompt(failure_type)
         judge_user_msg = build_judge_prompt(
             memories=entry["memories"],
             query=entry["query"],
