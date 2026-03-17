@@ -33,6 +33,6 @@
   
   "method": "partitioned",
   "input": "benchmark_samples/full_benchmark.jsonl",
-  "output": "outputs/persist_full_partitioned_llama3p3_70b_qwen3_235b.json",
+  "output": "outputs/persistbench/partitioned/persist_full_partitioned_llama3p3_70b_qwen3_235b.json",
   "concurrency": 250
 }

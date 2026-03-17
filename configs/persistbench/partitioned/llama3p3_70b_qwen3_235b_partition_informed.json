@@ -33,6 +33,6 @@
   "prompt_template": "prompts/evaluation_partition_informed.txt",
   "method": "partitioned",
   "input": "benchmark_samples/full_benchmark.jsonl",
-  "output": "outputs/persistbench/partitioned_defence/persist_full_partitioned_partition_informed_llama3p3_70b_qwen3_235b.json",
-  "concurrency": 50
+  "output": "outputs/persistbench/partitioned/persist_full_partitioned_partition_informed_llama3p3_70b_qwen3_235b.json",
+  "concurrency": 100
 }
