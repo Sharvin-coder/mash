@@ -6,7 +6,6 @@
       "mode": "sequential",
       "api_params": {
         "location": "us-central1",
-        "temperature": 0.2,
         "max_output_tokens": 1024
       }
     },
@@ -16,15 +15,13 @@
       "mode": "sequential",
       "api_params": {
         "location": "global",
-        "temperature": 0.2,
         "max_output_tokens": 1024
       }
     }
   ],
   "judge_model": "moonshotai/kimi-k2-thinking-maas",
   "judge_provider": "vertexai",
-  "input": "benchmark_samples/cross_domain.jsonl",
-  "output": "outputs/persist_full_llama3p3_70b_qwen3_235b.json",
-  "concurrency": 1,
-  "limit": 5
+  "input": "benchmark_samples/full_benchmark.jsonl",
+  "output": "outputs/persistbench/baseline/persist_full_llama3p3_70b_qwen3_235b.json",
+  "concurrency": 250
 }
