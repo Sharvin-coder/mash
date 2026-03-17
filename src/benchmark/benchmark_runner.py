@@ -206,6 +206,35 @@ def _load_cim_entries(config: BenchmarkConfig) -> list[InputEntry]:
     return samples_to_input_entries(samples, dataset="cim")
 
 
+def _load_partitioned_entries(config: BenchmarkConfig) -> list[InputEntry]:
+    """Load entries per model and merge them with model affinity tags (partitioned mode).
+
+    Each entry records which models should process it via a 'model_affinity' set.
+    Entries that appear in multiple models' input files are merged and both model
+    names are added to their affinity set.
+    """
+    merged: dict[str, InputEntry] = {}  # hash_id -> entry
+
+    for model in config.models:
+        model_input = model.input or config.input
+        model_entries = load_and_validate_entries(model_input)
+        for entry in model_entries:
+            hash_id = entry["hash_id"]
+            if hash_id in merged:
+                merged[hash_id]["model_affinity"].add(model.name)
+                # Store this model's (possibly different) memories separately so
+                # generation can use the right memories for each model.
+                merged[hash_id].setdefault("model_memories", {})[model.name] = entry["memories"]
+            else:
+                entry["model_affinity"] = {model.name}
+                entry["model_memories"] = {model.name: entry["memories"]}
+                merged[hash_id] = entry
+
+    entries = list(merged.values())
+    print(f"Partitioned mode: {len(entries)} unique entries across {len(config.models)} model(s)")
+    return entries
+
+
 def _load_from_file(
     file_path: Path,
     limit: int | None = None,
@@ -246,6 +275,8 @@ def _load_from_file(
             )
         elif effective_dataset == "cim":
             entries = _load_cim_entries(config)
+        elif config.method == "partitioned":
+            entries = _load_partitioned_entries(config)
         else:
             entries = load_and_validate_entries(config.input)
         is_fresh_config = True

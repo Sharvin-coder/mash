@@ -96,7 +96,10 @@ def load_and_validate_entries(input_file: Path) -> list[InputEntry]:
             raise FatalBenchmarkError("'query' must be a non-empty string")
 
         memories = _normalize_memories(memories)
-        hash_id = generate_hash_id(memories, query)
+        # Use the hash_id already stored in the file (e.g. written by partition_memories.py
+        # from the original flat memories) so all models share one stable hash per sample.
+        # Fall back to computing from the normalized memories for plain input files.
+        hash_id = raw_entry.get("hash_id") or generate_hash_id(memories, query)
         failure_type = resolve_entry_configuration(raw_entry)
         validate_failure_type(failure_type)
 
@@ -189,6 +192,12 @@ def _hydrate_checkpoint_entry(
             for key in ("required_attributes", "forbidden_attributes", "cim_metadata"):
                 if key in entry:
                     entry_data[key] = entry[key]
+        # Persist model affinity (partitioned mode) as a sorted list for JSON compatibility
+        if "model_affinity" in entry:
+            entry_data["model_affinity"] = sorted(entry["model_affinity"])
+        # Persist per-model memories (partitioned mode) keyed by model name
+        if "model_memories" in entry:
+            entry_data["model_memories"] = entry["model_memories"]
         checkpoint["entries"][hash_id] = entry_data
         return
 
@@ -208,6 +217,12 @@ def _hydrate_checkpoint_entry(
             )
         checkpoint["entries"][hash_id]["failure_type"] = new_leak
 
+    # Merge any new per-model memories (e.g. a new model added on resume)
+    if "model_memories" in entry:
+        stored_mm = existing_entry.setdefault("model_memories", {})
+        for model_name, mems in entry["model_memories"].items():
+            stored_mm.setdefault(model_name, mems)
+
 
 def _queue_generations_for_entry(
     checkpoint: Checkpoint,
@@ -219,8 +234,19 @@ def _queue_generations_for_entry(
     pending_work: list[WorkItem] = []
     completed_count = 0
 
+    # model_affinity restricts which models process this entry (partitioned mode)
+    model_affinity: set[str] | None = None
+    stored_affinity = checkpoint["entries"][hash_id].get("model_affinity")
+    if stored_affinity is not None:
+        model_affinity = set(stored_affinity)
+    elif "model_affinity" in entry:
+        model_affinity = set(entry["model_affinity"])
+
     for model in models:
         model_name = model.name
+
+        if model_affinity is not None and model_name not in model_affinity:
+            continue  # This entry is not assigned to this model in partitioned mode
 
         if model_name not in checkpoint["entries"][hash_id]["results"]:
             checkpoint["entries"][hash_id]["results"][model_name] = {
@@ -276,6 +302,12 @@ def extract_entries_from_checkpoint(checkpoint: Checkpoint) -> list[InputEntry]:
         for key in ("required_attributes", "forbidden_attributes", "cim_metadata"):
             if key in entry_data:
                 entry[key] = entry_data[key]
+        # Restore model affinity for partitioned mode
+        if "model_affinity" in entry_data:
+            entry["model_affinity"] = set(entry_data["model_affinity"])
+        # Restore per-model memories for partitioned mode
+        if "model_memories" in entry_data:
+            entry["model_memories"] = entry_data["model_memories"]
         entries.append(entry)
     return entries
 
