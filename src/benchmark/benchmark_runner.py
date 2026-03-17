@@ -368,6 +368,7 @@ async def run_benchmark(
             set_eval_strategy(strategy)
             print(f"Evaluation strategy: {strategy.name} — {strategy.description}")
         else:
+            print(f"Evaluation strategy: {None}")
             set_eval_strategy(None)
 
     entries, config, is_fresh_config, existing_checkpoint = _load_from_file(

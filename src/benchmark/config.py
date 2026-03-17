@@ -293,6 +293,8 @@ def load_benchmark_config_data(
             raise ValueError(
                 f"Prompt template file {config.prompt_template} does not exist"
             )
+        else:
+            print(f"prompt template for {model_names} is {config.prompt_template}")
         with open(template_path, "r", encoding="utf-8") as f:
             config.prompt_template_content = f.read()
 

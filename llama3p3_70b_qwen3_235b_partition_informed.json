@@ -1,12 +1,11 @@
 {
-  
   "models": [
  
     {
       "name": "meta/llama-3.3-70b-instruct-maas",
       "provider": "vertexai",
       "mode": "sequential",
-      "input": "../../../benchmark_samples/partitioned/llama3p3_70b/full_benchmark.jsonl",
+      "input": "benchmark_samples/partitioned/llama3p3_70b/full_benchmark.jsonl",
       "api_params": {
         "location": "us-central1",
         "max_output_tokens": 1024
@@ -17,7 +16,7 @@
       "name": "qwen/qwen3-235b-a22b-instruct-2507-maas",
       "provider": "vertexai",
       "mode": "sequential",
-      "input": "../../../benchmark_samples/partitioned/qwen3_235b/full_benchmark.jsonl",
+      "input": "benchmark_samples/partitioned/qwen3_235b/full_benchmark.jsonl",
       "api_params": {
         "location": "global",
         "max_output_tokens": 1024
@@ -31,9 +30,9 @@
     "temperature": 0
   },
   
-  "system_prompt": "../../../prompts/defensive/GEPA_optimized.txt",
+  "prompt_template": "prompts/evaluation_partition_informed.txt",
   "method": "partitioned",
-  "input": "../../../benchmark_samples/full_benchmark.jsonl",
-  "output": "../../../outputs/persist_bench/partitioned_defence/persist_full_partitioned_llama3p3_70b_qwen3_235b_GEPA_opt.json",
-  "concurrency": 250
+  "input": "benchmark_samples/full_benchmark.jsonl",
+  "output": "outputs/persistbench/partitioned_defence/persist_full_partitioned_partition_informed_llama3p3_70b_qwen3_235b.json",
+  "concurrency": 50
 }
