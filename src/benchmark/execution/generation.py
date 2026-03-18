@@ -291,6 +291,14 @@ async def _generate_model_response(
             )
         else:
             generation_prompt = build_generation_prompt(memories, model.name)
+
+        print(f"\n{'='*80}")
+        print(f"MODEL: {model.name}")
+        print(f"{'='*80}")
+        print(f"--- SYSTEM PROMPT ---\n{generation_prompt}")
+        print(f"--- USER MESSAGE ---\n{query}")
+        print(f"{'='*80}\n")
+
         result = await generate_response_fn(model, generation_prompt, query)
 
         sanitized_response = _sanitize_response_text(result.get("response"))
