@@ -40,6 +40,7 @@ from benchmark.work_planner import InputEntry, WorkItem
 BATCH_REQUEST_DELIMITER = "__"
 PHASE_GENERATION = "generation"
 ERROR_EMPTY_RESPONSE = "Empty or whitespace-only response"
+PRINT_PROMPTS = False
 
 __all__ = [
     "BATCH_REQUEST_DELIMITER",
@@ -292,12 +293,13 @@ async def _generate_model_response(
         else:
             generation_prompt = build_generation_prompt(memories, model.name)
 
-        print(f"\n{'='*80}")
-        print(f"MODEL: {model.name}")
-        print(f"{'='*80}")
-        print(f"--- SYSTEM PROMPT ---\n{generation_prompt}")
-        print(f"--- USER MESSAGE ---\n{query}")
-        print(f"{'='*80}\n")
+        if PRINT_PROMPTS:
+            print(f"\n{'='*80}")
+            print(f"MODEL: {model.name}")
+            print(f"{'='*80}")
+            print(f"--- SYSTEM PROMPT ---\n{generation_prompt}")
+            print(f"--- USER MESSAGE ---\n{query}")
+            print(f"{'='*80}\n")
 
         result = await generate_response_fn(model, generation_prompt, query)
 

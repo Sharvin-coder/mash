@@ -4,7 +4,7 @@
     {
       "name": "meta/llama-3.3-70b-instruct-maas",
       "provider": "vertexai",
-      "mode": "batch",
+      "mode": "sequential",
       "input": "benchmark_samples/partitioned/llama3p3_70b/cross_domain_and_beneficial.jsonl",
       "api_params": {
         "location": "us-central1",
@@ -15,7 +15,7 @@
     {
       "name": "qwen/qwen3-235b-a22b-instruct-2507-maas",
       "provider": "vertexai",
-      "mode": "batch",
+      "mode": "sequential",
       "input": "benchmark_samples/partitioned/qwen3_235b/cross_domain_and_beneficial.jsonl",
       "api_params": {
         "location": "global",
@@ -30,9 +30,9 @@
     "temperature": 0
   },
   
-  "prompt_template": "prompts/defensive/restrictive.txt",
+  "prompt_template": "prompts/defensive/permissive.txt",
   "method": "partitioned",
   "input": "benchmark_samples/full_benchmark.jsonl",
-  "output": "outputs/persistbench/partitioned_defence/persist_full_partitioned_restrictive_llama3p3_70b_qwen3_235b.json",
-  "concurrency": 50
+  "output": "outputs/persistbench/partitioned_defence/persist_full_partitioned_permissive_llama3p3_70b_qwen3_235b.json",
+  "concurrency": 75
 }
