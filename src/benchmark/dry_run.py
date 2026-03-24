@@ -285,7 +285,7 @@ def run_dry_run(
             )
 
         console.print(
-            f"\n[bold green]📄 Full prompts saved to:[/bold green] [cyan]{dry_run_prompts_file}[/cyan]"
+            f"\n[bold green]Full prompts saved to:[/bold green] [cyan]{dry_run_prompts_file}[/cyan]"
         )
         console.print("[dim]   View this file to see all prompt sections[/dim]\n")
     except Exception as e:

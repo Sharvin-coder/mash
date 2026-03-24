@@ -298,6 +298,39 @@ def build_generation_prompt(
     )
 
 
+def is_cim_user_message_template(template: str) -> bool:
+    """Return True if the template should be used as a CIM user message.
+
+    CIM defense templates use {task} and {recipient} placeholders that map to
+    the structured task/recipient extracted from the CIMemories dataset. When
+    these are present the template replaces the user message (matching the
+    paper's single-message architecture) rather than being used as a system
+    prompt.
+    """
+    return "{task}" in template or "{recipient}" in template
+
+
+def build_cim_user_message(
+    memories: list[str],
+    task: str,
+    recipient: str,
+    template: str,
+) -> str:
+    """Build a CIM user message by substituting memories, task, and recipient.
+
+    Memories are formatted as plain newline-separated text (matching the
+    CIMemories HuggingFace dataset format, not the XML format used for system
+    prompts).
+    """
+    memories_text = "\n".join(memories)
+    return (
+        template.replace("{memories}", memories_text)
+        .replace("{task}", task)
+        .replace("{recipient}", recipient)
+    )
+
+
+
 def build_judge_prompt(
     memories: list[str],
     query: str,

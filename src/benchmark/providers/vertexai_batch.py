@@ -78,36 +78,49 @@ def _build_request(item: BatchWorkItem) -> dict[str, Any]:
 def _parse_openai_result(
     result: dict[str, Any],
 ) -> tuple[str | None, dict[str, Any], str | None, dict[str, Any]]:
-    """Extract error, raw body, response text, and top-level raw from an OpenAI-format result."""
+    """Extract error, raw body, response text, and top-level raw from a batch result.
+
+    Handles two formats:
+    - OpenAI batch format: response has "status_code" + "body" keys, error is a dict
+    - Vertex AI MaaS flat format: response is the chat completion object directly
+      (has "choices" at top level), error is a string ("" for success)
+    """
     response_data = result.get("response") or {}
     error_data = result.get("error")
     top_level_raw = response_data or error_data or {}
 
-    # Top-level error (e.g., batch_expired)
+    # Top-level error — dict (OpenAI format) or non-empty string (Vertex MaaS format)
     if error_data:
-        code = error_data.get("code", "unknown")
-        msg = error_data.get("message", "No error message")
-        return f"{code}: {msg}", {}, None, top_level_raw
+        if isinstance(error_data, dict):
+            code = error_data.get("code", "unknown")
+            msg = error_data.get("message", "No error message")
+            return f"{code}: {msg}", {}, None, top_level_raw
+        elif isinstance(error_data, str):
+            return error_data, {}, None, top_level_raw
 
-    # Decode body if it's a JSON string
-    body = response_data.get("body")
-    if isinstance(body, str):
-        try:
-            body = json.loads(body)
-        except json.JSONDecodeError:
-            body = {}
-    body = body or {}
+    # Vertex AI MaaS flat format: chat completion object is directly in response_data
+    if "choices" in response_data:
+        body = response_data
+    else:
+        # OpenAI batch format: body is nested under a "body" key
+        body = response_data.get("body")
+        if isinstance(body, str):
+            try:
+                body = json.loads(body)
+            except json.JSONDecodeError:
+                body = {}
+        body = body or {}
 
-    # HTTP error
-    if response_data.get("status_code") != 200:
-        err = body.get("error") or {}
-        parts = [f"HTTP {response_data.get('status_code')}"]
-        if err.get("code"):
-            parts.append(f"code={err['code']}")
-        if err.get("type"):
-            parts.append(f"type={err['type']}")
-        parts.append(err.get("message", "Unknown error"))
-        return ": ".join(parts), {}, None, top_level_raw
+        # HTTP error
+        if response_data.get("status_code") != 200:
+            err = body.get("error") or {}
+            parts = [f"HTTP {response_data.get('status_code')}"]
+            if err.get("code"):
+                parts.append(f"code={err['code']}")
+            if err.get("type"):
+                parts.append(f"type={err['type']}")
+            parts.append(err.get("message", "Unknown error"))
+            return ": ".join(parts), {}, None, top_level_raw
 
     # Success — parse choices
     choices = body.get("choices", [])

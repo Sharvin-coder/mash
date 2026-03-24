@@ -25,7 +25,11 @@ from benchmark.config import (
 )
 from benchmark.exceptions import FatalBenchmarkError
 from benchmark.types import GenerationEntry
-from benchmark.prompts import build_generation_prompt
+from benchmark.prompts import (
+    build_cim_user_message,
+    build_generation_prompt,
+    is_cim_user_message_template,
+)
 from benchmark.provider_registry import PROVIDERS, get_batch_provider
 from benchmark.protocols import (
     BatchGenerateFn,
@@ -238,6 +242,8 @@ async def _process_generation_task(
             task.entry["query"],
             task.memories,
             prompt_template,
+            cim_task=task.entry.get("cim_task"),
+            cim_recipient=task.entry.get("cim_recipient"),
         )
 
         if not store_raw_api_responses:
@@ -283,10 +289,25 @@ async def _generate_model_response(
     query: str,
     memories: list[str],
     prompt_template: str | None = None,
+    cim_task: str | None = None,
+    cim_recipient: str | None = None,
 ) -> tuple[str | None, dict[str, Any], str | None]:
     """Call generation function and handle errors."""
     try:
-        if prompt_template:
+        # CIM defense templates use {task}/{recipient} and should replace the
+        # user message (matching the paper's single-message architecture).
+        # In that case the system prompt is left empty.
+        if (
+            prompt_template
+            and cim_task
+            and cim_recipient
+            and is_cim_user_message_template(prompt_template)
+        ):
+            generation_prompt = ""
+            query = build_cim_user_message(
+                memories, cim_task, cim_recipient, prompt_template
+            )
+        elif prompt_template:
             generation_prompt = build_generation_prompt(
                 memories, model.name, prompt_template
             )
@@ -509,20 +530,35 @@ def _prepare_generation_batch_items(
 ) -> list[BatchWorkItem]:
     batch_items: list[BatchWorkItem] = []
     for task in tasks:
-        if prompt_template:
+        cim_task = task.entry.get("cim_task")
+        cim_recipient = task.entry.get("cim_recipient")
+
+        if (
+            prompt_template
+            and cim_task
+            and cim_recipient
+            and is_cim_user_message_template(prompt_template)
+        ):
+            generation_prompt = ""
+            user_message = build_cim_user_message(
+                task.memories, cim_task, cim_recipient, prompt_template
+            )
+        elif prompt_template:
             generation_prompt = build_generation_prompt(
                 task.memories, task.model.name, prompt_template
             )
+            user_message = task.entry["query"]
         else:
             generation_prompt = build_generation_prompt(
                 task.memories, task.model.name
             )
+            user_message = task.entry["query"]
 
         single_item: BatchWorkItem = {
             "request_id": _make_request_id(task.hash_id, task.gen_idx),
             "model": task.model,
             "system_prompt": generation_prompt,
-            "user_message": task.entry["query"],
+            "user_message": user_message,
         }
         batch_items.append(single_item)
 
