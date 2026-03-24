@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PersistBench // Output Comparator</title>
+<style>
+:root {
+  --bg0: #04080f;
+  --bg1: #080e1c;
+  --bg2: #0c1528;
+  --bg3: #111d35;
+  --cyan: #00e5ff;
+  --cyan-dim: #0097a7;
+  --purple: #b57bee;
+  --purple-dim: #7b52a8;
+  --green: #00ffa3;
+  --orange: #ff7043;
+  --yellow: #ffd54f;
+  --red: #ff5252;
+  --text: #cce0f5;
+  --text-dim: #5a7a9a;
+  --text-muted: #3a5070;
+  --s1: #00ffa3; --s2: #a5d63b; --s3: #ffd54f; --s4: #ff7043; --s5: #ff5252;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg0);
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  height: 100vh;
+  overflow: hidden;
+  background-image:
+    linear-gradient(rgba(0,229,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* ─── SCANLINES ─────────────────────────────────────────────── */
+body::after {
+  content:'';
+  position:fixed; inset:0;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,.06) 0px, rgba(0,0,0,.06) 1px, transparent 1px, transparent 3px);
+  pointer-events:none; z-index:9999;
+}
+
+/* ─── HEADER ─────────────────────────────────────────────────── */
+#hdr {
+  height:52px;
+  background: linear-gradient(90deg, #060d1f, #0a142a);
+  border-bottom: 1px solid rgba(0,229,255,.25);
+  box-shadow: 0 0 40px rgba(0,229,255,.08);
+  display:flex; align-items:center; padding:0 24px; gap:16px;
+  position:relative; z-index:100;
+}
+.logo { font-size:18px; font-weight:bold; letter-spacing:4px; color:var(--cyan); text-shadow:0 0 20px var(--cyan); }
+.logo em { color:var(--purple); font-style:normal; }
+.logo-sub { font-size:9px; color:var(--text-dim); letter-spacing:3px; text-transform:uppercase; margin-top:2px; }
+.pulse { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 10px var(--green); margin-left:auto; animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+#btn-back {
+  display:none;
+  background:none; border:1px solid rgba(0,229,255,.3); color:var(--text-dim);
+  padding:4px 14px; font-family:inherit; font-size:9px; letter-spacing:2px;
+  cursor:pointer; border-radius:3px; text-transform:uppercase; transition:.2s;
+}
+#btn-back:hover { border-color:var(--cyan); color:var(--cyan); box-shadow:0 0 12px rgba(0,229,255,.2); }
+
+/* ─── UPLOAD SCREEN ──────────────────────────────────────────── */
+#scr-upload {
+  height:calc(100vh - 52px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:36px;
+}
+.up-title { font-size:26px; color:var(--cyan); letter-spacing:5px; text-transform:uppercase; text-shadow:0 0 30px var(--cyan); }
+.up-sub { font-size:10px; color:var(--text-dim); letter-spacing:3px; margin-top:6px; text-align:center; }
+.up-grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; }
+.up-col-lbl { font-size:10px; letter-spacing:3px; text-transform:uppercase; text-align:center; margin-bottom:10px; }
+.up-col-lbl.a { color:var(--cyan); } .up-col-lbl.b { color:var(--purple); }
+
+.drop-zone {
+  width:340px; height:190px;
+  border:2px dashed rgba(0,229,255,.4); border-radius:8px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; transition:.3s; background:rgba(0,229,255,.025);
+  position:relative; overflow:hidden;
+}
+.drop-zone::before {
+  content:''; position:absolute; inset:-100%;
+  background: conic-gradient(transparent 270deg, rgba(0,229,255,.07) 360deg);
+  animation:spin 5s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.drop-zone.b-zone { border-color:rgba(181,123,238,.4); background:rgba(181,123,238,.025); }
+.drop-zone.b-zone::before { background: conic-gradient(transparent 270deg, rgba(181,123,238,.07) 360deg); }
+.drop-zone:hover, .drop-zone.over { border-color:var(--green); background:rgba(0,255,163,.04); box-shadow:0 0 30px rgba(0,255,163,.15); }
+.drop-zone.loaded { border-style:solid; border-color:var(--green); background:rgba(0,255,163,.03); }
+.drop-inner { position:relative; z-index:1; text-align:center; padding:16px; }
+.drop-icon { font-size:36px; margin-bottom:10px; }
+.drop-lbl { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--cyan); margin-bottom:6px; }
+.b-zone .drop-lbl { color:var(--purple); }
+.drop-hint { font-size:9px; color:var(--text-dim); }
+.drop-fname { font-size:10px; color:var(--green); margin-top:6px; word-break:break-all; }
+input[type=file] { display:none; }
+
+#btn-go {
+  background:linear-gradient(135deg,rgba(0,229,255,.1),rgba(181,123,238,.1));
+  border:1px solid var(--cyan); color:var(--cyan);
+  padding:13px 52px; font-family:inherit; font-size:13px;
+  letter-spacing:3px; text-transform:uppercase; cursor:pointer;
+  border-radius:4px; transition:.3s; box-shadow:0 0 20px rgba(0,229,255,.08);
+}
+#btn-go:hover:not(:disabled) { box-shadow:0 0 35px rgba(0,229,255,.3); text-shadow:0 0 10px var(--cyan); background:linear-gradient(135deg,rgba(0,229,255,.18),rgba(181,123,238,.18)); }
+#btn-go:disabled { opacity:.35; cursor:not-allowed; }
+
+/* ─── COMPARISON SCREEN ──────────────────────────────────────── */
+#scr-cmp { display:none; height:calc(100vh - 52px); flex-direction:column; overflow:hidden; }
+.stats-bar {
+  display:flex; gap:18px; padding:7px 20px;
+  background:var(--bg2); border-bottom:1px solid rgba(0,229,255,.12);
+  font-size:9px; color:var(--text-dim); letter-spacing:1px; flex-shrink:0;
+}
+.stat { display:flex; gap:5px; }
+.stat-v { color:var(--cyan); font-weight:bold; }
+.layout { display:grid; grid-template-columns:310px 1fr; flex:1; overflow:hidden; }
+
+/* ─── SIDEBAR ────────────────────────────────────────────────── */
+.sidebar {
+  background:var(--bg1); border-right:1px solid rgba(0,229,255,.15);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.sb-hdr {
+  padding:11px 14px; background:var(--bg2);
+  border-bottom:1px solid rgba(0,229,255,.15);
+  font-size:10px; letter-spacing:2px; color:var(--cyan); text-transform:uppercase;
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+}
+.sb-count { background:rgba(0,229,255,.1); border:1px solid rgba(0,229,255,.25); padding:2px 7px; border-radius:10px; font-size:9px; }
+.sb-search { padding:9px 11px; background:var(--bg2); border-bottom:1px solid rgba(0,229,255,.08); flex-shrink:0; }
+.sb-search input {
+  width:100%; background:rgba(0,229,255,.04); border:1px solid rgba(0,229,255,.18);
+  border-radius:3px; padding:6px 10px; color:var(--text);
+  font-family:inherit; font-size:10px; outline:none; transition:.2s;
+}
+.sb-search input:focus { border-color:var(--cyan); box-shadow:0 0 8px rgba(0,229,255,.1); }
+.sb-sort { display:flex; gap:5px; padding:7px 11px; background:var(--bg2); border-bottom:1px solid rgba(0,229,255,.08); flex-shrink:0; }
+.sort-btn {
+  background:none; border:1px solid rgba(0,229,255,.15); color:var(--text-dim);
+  padding:3px 9px; font-family:inherit; font-size:8px; letter-spacing:1px;
+  cursor:pointer; border-radius:3px; transition:.2s; text-transform:uppercase;
+}
+.sort-btn:hover,.sort-btn.on { border-color:var(--cyan); color:var(--cyan); }
+.sample-list { flex:1; overflow-y:auto; }
+.sample-list::-webkit-scrollbar { width:3px; }
+.sample-list::-webkit-scrollbar-thumb { background:rgba(0,229,255,.2); border-radius:2px; }
+
+.si {
+  padding:11px 13px; border-bottom:1px solid rgba(0,229,255,.05);
+  cursor:pointer; transition:.15s; border-left:3px solid transparent;
+}
+.si:hover { background:rgba(0,229,255,.04); }
+.si.sel { background:rgba(0,229,255,.07); border-left-color:var(--cyan); }
+.si-q {
+  font-size:10px; line-height:1.45; margin-bottom:7px; color:var(--text);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.si-chips { display:flex; flex-wrap:wrap; gap:4px; }
+.chip {
+  display:inline-flex; align-items:center; gap:3px;
+  padding:2px 6px; border-radius:10px; font-size:8px; letter-spacing:.3px; border:1px solid;
+}
+.chip-n { font-weight:bold; font-size:10px; }
+.chip-m { opacity:.75; max-width:75px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.s1{color:var(--s1);border-color:var(--s1);background:rgba(0,255,163,.07);}
+.s2{color:var(--s2);border-color:var(--s2);background:rgba(165,214,59,.07);}
+.s3{color:var(--s3);border-color:var(--s3);background:rgba(255,213,79,.07);}
+.s4{color:var(--s4);border-color:var(--s4);background:rgba(255,112,67,.07);}
+.s5{color:var(--s5);border-color:var(--s5);background:rgba(255,82,82,.07);}
+.only-tag { font-size:8px; padding:1px 5px; border-radius:3px; }
+.only-a { background:rgba(0,229,255,.1); color:var(--cyan); }
+.only-b { background:rgba(181,123,238,.1); color:var(--purple); }
+
+/* ─── COMPARISON PANEL ───────────────────────────────────────── */
+.cmp-panel { display:flex; flex-direction:column; overflow:hidden; background:var(--bg0); }
+.cmp-toolbar {
+  padding:9px 18px; background:var(--bg2); border-bottom:1px solid rgba(0,229,255,.15);
+  display:flex; align-items:center; gap:10px; font-size:10px; flex-shrink:0;
+}
+.fl { padding:3px 11px; border-radius:3px; font-size:10px; font-weight:bold; letter-spacing:1px; }
+.fl-a { background:rgba(0,229,255,.1); border:1px solid rgba(0,229,255,.35); color:var(--cyan); }
+.fl-b { background:rgba(181,123,238,.1); border:1px solid rgba(181,123,238,.35); color:var(--purple); }
+.cmp-body { flex:1; overflow-y:auto; padding:18px; }
+.cmp-body::-webkit-scrollbar { width:4px; }
+.cmp-body::-webkit-scrollbar-thumb { background:rgba(0,229,255,.15); border-radius:2px; }
+
+.empty {
+  height:100%; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px; color:var(--text-muted);
+}
+.empty-ico { font-size:44px; opacity:.25; }
+.empty-txt { font-size:11px; letter-spacing:3px; text-transform:uppercase; opacity:.4; }
+
+/* ─── SECTIONS ───────────────────────────────────────────────── */
+.sec {
+  margin-bottom:20px;
+  border:1px solid rgba(0,229,255,.12); border-radius:8px; overflow:hidden;
+  background:var(--bg1);
+}
+.sec-hdr {
+  padding:9px 15px; background:var(--bg2);
+  border-bottom:1px solid rgba(0,229,255,.12);
+  font-size:9px; letter-spacing:2px; text-transform:uppercase;
+  display:flex; align-items:center; gap:8px;
+}
+.sec-hdr.cyan { color:var(--cyan); }
+.sec-hdr.purple { color:var(--purple); }
+.sec-hdr.green { color:var(--green); }
+.sec-body { padding:15px; }
+
+.query-txt {
+  font-size:13px; line-height:1.7; color:var(--text);
+  padding:11px 14px;
+  background:rgba(0,229,255,.03);
+  border-left:3px solid var(--cyan); border-radius:0 4px 4px 0;
+}
+
+.mem-list { display:flex; flex-direction:column; gap:5px; }
+.mem-item {
+  display:flex; align-items:flex-start; gap:8px;
+  padding:7px 10px; font-size:11px; line-height:1.5;
+  background:rgba(181,123,238,.04); border:1px solid rgba(181,123,238,.12); border-radius:4px;
+}
+.mem-dot { color:var(--purple); margin-top:2px; flex-shrink:0; }
+.cat-badge {
+  display:inline-block; padding:1px 7px; border-radius:10px;
+  font-size:8px; font-weight:bold; letter-spacing:1px; text-transform:uppercase;
+  margin-right:5px; flex-shrink:0; white-space:nowrap;
+}
+.c-health    { background:rgba(255,82,82,.15);   color:#ff7070; }
+.c-personal  { background:rgba(0,229,255,.15);   color:var(--cyan); }
+.c-education { background:rgba(181,123,238,.15); color:var(--purple); }
+.c-work      { background:rgba(255,213,79,.15);  color:var(--yellow); }
+.c-finance   { background:rgba(0,255,163,.15);   color:var(--green); }
+.c-relationships { background:rgba(255,112,67,.15); color:var(--orange); }
+.c-social    { background:rgba(0,229,255,.12);   color:#88ddff; }
+.c-other     { background:rgba(90,90,90,.2);     color:#aaa; }
+
+/* ─── MODEL COMPARISON GRID ──────────────────────────────────── */
+.model-section { margin-bottom:22px; }
+.model-row-hdr {
+  font-size:10px; color:var(--text-dim); letter-spacing:2px; text-transform:uppercase;
+  margin-bottom:10px; padding-bottom:6px;
+  border-bottom:1px solid rgba(0,229,255,.08);
+  display:flex; align-items:center; gap:8px;
+}
+.cmp-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+.fp {
+  border-radius:7px; overflow:hidden;
+  border:1px solid rgba(0,229,255,.1); background:rgba(0,229,255,.02);
+}
+.fp.b { border-color:rgba(181,123,238,.15); background:rgba(181,123,238,.02); }
+.fp-hdr {
+  padding:9px 13px; display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid rgba(0,229,255,.1);
+  background:rgba(0,229,255,.06);
+}
+.fp.b .fp-hdr { border-bottom-color:rgba(181,123,238,.15); background:rgba(181,123,238,.06); }
+.fp-name { font-size:10px; font-weight:bold; letter-spacing:1px; color:var(--cyan); }
+.fp.b .fp-name { color:var(--purple); }
+.fp-score { display:flex; align-items:baseline; gap:3px; }
+.score-big { font-size:22px; font-weight:bold; line-height:1; text-shadow:0 0 12px currentColor; }
+.score-denom { font-size:9px; opacity:.5; }
+.fp-body { padding:12px; }
+
+.part-hdr { font-size:8px; color:var(--text-dim); letter-spacing:2px; text-transform:uppercase; margin-bottom:7px; }
+.part-group { margin-bottom:8px; }
+.part-cat { display:inline-block; margin-bottom:3px; }
+.part-mems { padding-left:12px; font-size:10px; color:var(--text-dim); line-height:1.55; }
+.part-mem { margin-bottom:2px; }
+
+.resp-lbl {
+  font-size:8px; color:var(--text-dim); letter-spacing:2px; text-transform:uppercase;
+  margin-bottom:7px; margin-top:12px; display:flex; align-items:center; gap:7px;
+}
+.resp-lbl::after { content:''; flex:1; height:1px; background:rgba(0,229,255,.08); }
+.resp-box {
+  font-size:11px; line-height:1.7; color:var(--text);
+  background:rgba(0,0,0,.25); border:1px solid rgba(0,229,255,.07); border-radius:4px;
+  padding:10px 12px; max-height:280px; overflow-y:auto;
+  scrollbar-width:thin; scrollbar-color:rgba(0,229,255,.15) transparent;
+  white-space:pre-wrap; word-break:break-word;
+}
+.resp-box::-webkit-scrollbar { width:3px; }
+.resp-box::-webkit-scrollbar-thumb { background:rgba(0,229,255,.15); }
+
+.judge-box {
+  margin-top:10px; padding:10px 12px;
+  background:rgba(255,112,67,.04); border:1px solid rgba(255,112,67,.18); border-radius:4px;
+}
+.judge-lbl { font-size:8px; color:var(--orange); letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; }
+.judge-txt {
+  font-size:10px; line-height:1.6; color:#ffb090;
+  max-height:180px; overflow-y:auto;
+  scrollbar-width:thin; scrollbar-color:rgba(255,112,67,.2) transparent;
+}
+.judge-txt::-webkit-scrollbar { width:3px; }
+.judge-txt::-webkit-scrollbar-thumb { background:rgba(255,112,67,.2); }
+
+.not-found { padding:30px 16px; text-align:center; color:var(--text-muted); font-size:11px; }
+.not-found-ico { font-size:28px; margin-bottom:8px; opacity:.25; }
+
+.fail-badge { font-size:8px; padding:1px 7px; border-radius:10px; margin-left:auto; }
+.fail-cross  { background:rgba(255,82,82,.15);   color:#ff7070; border:1px solid rgba(255,82,82,.3); }
+.fail-none   { background:rgba(0,255,163,.12);   color:var(--green); border:1px solid rgba(0,255,163,.3); }
+.fail-other  { background:rgba(255,213,79,.12);  color:var(--yellow); border:1px solid rgba(255,213,79,.3); }
+
+.runs-tag { font-size:8px; color:var(--text-dim); padding:1px 6px; border-radius:3px; background:rgba(255,255,255,.04); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="hdr">
+  <div>
+    <div class="logo">PERSIST<em>BENCH</em></div>
+    <div class="logo-sub">Output Analysis System</div>
+  </div>
+  <div class="pulse" style="margin-left:auto"></div>
+  <span style="font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-left:8px">ONLINE</span>
+  <button id="btn-back" onclick="showUpload()">◄ Reset</button>
+</div>
+
+<!-- UPLOAD SCREEN -->
+<div id="scr-upload">
+  <div>
+    <div class="up-title">Output Comparator</div>
+    <div class="up-sub">Load two JSON benchmark output files to compare</div>
+  </div>
+  <div class="up-grid">
+    <div>
+      <div class="up-col-lbl a">File A</div>
+      <div class="drop-zone" id="z1"
+        onclick="document.getElementById('f1').click()"
+        ondragover="dov(event)" ondrop="ddr(event,1)"
+        ondragenter="den(event,1)" ondragleave="dle(event,1)">
+        <div class="drop-inner">
+          <div class="drop-icon" id="di1">⬡</div>
+          <div class="drop-lbl">Drop JSON here</div>
+          <div class="drop-hint">or click to browse</div>
+          <div class="drop-fname" id="fn1"></div>
+        </div>
+      </div>
+      <input type="file" id="f1" accept=".json" onchange="loadFile(event,1)">
+    </div>
+    <div>
+      <div class="up-col-lbl b">File B</div>
+      <div class="drop-zone b-zone" id="z2"
+        onclick="document.getElementById('f2').click()"
+        ondragover="dov(event)" ondrop="ddr(event,2)"
+        ondragenter="den(event,2)" ondragleave="dle(event,2)">
+        <div class="drop-inner">
+          <div class="drop-icon" id="di2">⬡</div>
+          <div class="drop-lbl">Drop JSON here</div>
+          <div class="drop-hint">or click to browse</div>
+          <div class="drop-fname" id="fn2"></div>
+        </div>
+      </div>
+      <input type="file" id="f2" accept=".json" onchange="loadFile(event,2)">
+    </div>
+  </div>
+  <button id="btn-go" disabled onclick="launch()">► Launch Comparison</button>
+</div>
+
+<!-- COMPARISON SCREEN -->
+<div id="scr-cmp">
+  <div class="stats-bar" id="stats-bar"></div>
+  <div class="layout">
+    <div class="sidebar">
+      <div class="sb-hdr">
+        Samples <span class="sb-count" id="sb-count">0</span>
+      </div>
+      <div class="sb-search"><input id="q-search" placeholder="Search queries…" oninput="applyFilter()"></div>
+      <div class="sb-sort">
+        <button class="sort-btn on" data-s="def"   onclick="setSort(this)">Default</button>
+        <button class="sort-btn"   data-s="s-asc"  onclick="setSort(this)">Score ↑</button>
+        <button class="sort-btn"   data-s="s-desc" onclick="setSort(this)">Score ↓</button>
+        <button class="sort-btn"   data-s="diff"   onclick="setSort(this)">Δ Diff</button>
+      </div>
+      <div class="sample-list" id="sample-list"></div>
+    </div>
+    <div class="cmp-panel">
+      <div class="cmp-toolbar">
+        <span style="color:var(--text-dim);font-size:9px;letter-spacing:1px">COMPARING</span>
+        <span class="fl fl-a" id="tl-a">File A</span>
+        <span style="color:var(--text-muted)">vs</span>
+        <span class="fl fl-b" id="tl-b">File B</span>
+        <span style="margin-left:auto;font-size:9px;color:var(--text-muted)" id="tl-id"></span>
+      </div>
+      <div class="cmp-body" id="cmp-body">
+        <div class="empty">
+          <div class="empty-ico">◈</div>
+          <div class="empty-txt">Select a sample to compare</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────
+let D1=null, D2=null, N1='', N2='';
+let allKeys=[], dispKeys=[], selKey=null, sortMode='def';
+
+// ─── FILE LOADING ─────────────────────────────────────────────────────────
+function dov(e){e.preventDefault();}
+function den(e,s){e.preventDefault();document.getElementById('z'+s).classList.add('over');}
+function dle(e,s){document.getElementById('z'+s).classList.remove('over');}
+function ddr(e,s){e.preventDefault();dle(e,s);const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.json'))parseFile(f,s);}
+function loadFile(e,s){const f=e.target.files[0];if(f)parseFile(f,s);}
+function parseFile(f,s){
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(s===1){D1=d;N1=f.name;}else{D2=d;N2=f.name;}
+      document.getElementById('fn'+s).textContent=f.name;
+      document.getElementById('di'+s).textContent='✓';
+      document.getElementById('z'+s).classList.add('loaded');
+      document.getElementById('btn-go').disabled=!(D1&&D2);
+    }catch(err){alert('Invalid JSON: '+err.message);}
+  };
+  r.readAsText(f);
+}
+
+// ─── LAUNCH ───────────────────────────────────────────────────────────────
+function launch(){
+  if(!D1||!D2)return;
+  document.getElementById('scr-upload').style.display='none';
+  document.getElementById('scr-cmp').style.display='flex';
+  document.getElementById('btn-back').style.display='block';
+  document.getElementById('tl-a').textContent=N1.replace('.json','');
+  document.getElementById('tl-b').textContent=N2.replace('.json','');
+
+  const k1=new Set(Object.keys(D1.entries||{}));
+  const k2=new Set(Object.keys(D2.entries||{}));
+  allKeys=[...new Set([...k1,...k2])];
+
+  // stats
+  const shared=[...k1].filter(k=>k2.has(k)).length;
+  document.getElementById('stats-bar').innerHTML=
+    `<div class="stat">File A: <span class="stat-v">${k1.size}</span></div>`+
+    `<div class="stat">File B: <span class="stat-v">${k2.size}</span></div>`+
+    `<div class="stat">Shared: <span class="stat-v">${shared}</span></div>`+
+    `<div class="stat">Only A: <span class="stat-v">${k1.size-shared}</span></div>`+
+    `<div class="stat">Only B: <span class="stat-v">${k2.size-shared}</span></div>`;
+
+  sortMode='def'; applyFilter();
+}
+function showUpload(){
+  document.getElementById('scr-upload').style.display='flex';
+  document.getElementById('scr-cmp').style.display='none';
+  document.getElementById('btn-back').style.display='none';
+}
+
+// ─── SORT / FILTER ────────────────────────────────────────────────────────
+function setSort(btn){
+  document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); sortMode=btn.dataset.s; applyFilter();
+}
+function applyFilter(){
+  const q=(document.getElementById('q-search').value||'').trim().toLowerCase();
+  let keys=[...allKeys];
+  if(q) keys=keys.filter(k=>getQuery(k).toLowerCase().includes(q));
+  // sort
+  if(sortMode==='s-asc') keys.sort((a,b)=>avgScore(a)-avgScore(b));
+  else if(sortMode==='s-desc') keys.sort((a,b)=>avgScore(b)-avgScore(a));
+  else if(sortMode==='diff') keys.sort((a,b)=>scoreDiff(b)-scoreDiff(a));
+  dispKeys=keys;
+  renderList();
+}
+function getQuery(k){
+  const e=(D1&&D1.entries&&D1.entries[k])||(D2&&D2.entries&&D2.entries[k]);
+  return e?e.query:'';
+}
+function worstScore(modelData){
+  if(!modelData||!modelData.generations||!modelData.generations.length)return null;
+  let w=null;
+  for(const g of modelData.generations){
+    const sc=g.judge&&g.judge.score!=null?g.judge.score:null;
+    if(sc!==null&&(w===null||sc>w))w=sc;
+  }
+  return w;
+}
+function avgScore(k){
+  let t=0,c=0;
+  [[D1,k],[D2,k]].forEach(([d])=>{
+    if(!d||!d.entries||!d.entries[k])return;
+    const e=d.entries[k];
+    Object.values(e.results||{}).forEach(m=>{const s=worstScore(m);if(s!==null){t+=s;c++;}});
+  });
+  return c?t/c:0;
+}
+function scoreDiff(k){
+  const a1=scoreForData(D1,k), a2=scoreForData(D2,k);
+  return Math.abs(a1-a2);
+}
+function scoreForData(d,k){
+  if(!d||!d.entries||!d.entries[k])return 0;
+  const e=d.entries[k]; let t=0,c=0;
+  Object.values(e.results||{}).forEach(m=>{const s=worstScore(m);if(s!==null){t+=s;c++;}});
+  return c?t/c:0;
+}
+
+// ─── RENDER SAMPLE LIST ───────────────────────────────────────────────────
+function shortMdl(n){
+  if(!n)return'?';
+  const p=n.split('/'); return p[p.length-1].replace(/-instruct[\s\S]*/,'').substring(0,18);
+}
+function renderList(){
+  document.getElementById('sb-count').textContent=dispKeys.length;
+  if(!dispKeys.length){
+    document.getElementById('sample-list').innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:10px">No results</div>';
+    return;
+  }
+  document.getElementById('sample-list').innerHTML=dispKeys.map(k=>{
+    const e1=D1&&D1.entries&&D1.entries[k];
+    const e2=D2&&D2.entries&&D2.entries[k];
+    let chips='';
+    if(e1) Object.entries(e1.results||{}).forEach(([m,md])=>{
+      const s=worstScore(md);
+      if(s!==null) chips+=`<span class="chip s${s}" title="${hx(m)}"><span class="chip-n">${s}</span><span class="chip-m">A:${hx(shortMdl(m))}</span></span>`;
+    });
+    if(e2) Object.entries(e2.results||{}).forEach(([m,md])=>{
+      const s=worstScore(md);
+      if(s!==null) chips+=`<span class="chip s${s}" title="${hx(m)}"><span class="chip-n">${s}</span><span class="chip-m">B:${hx(shortMdl(m))}</span></span>`;
+    });
+    if(!e1) chips+=`<span class="only-tag only-b">B only</span>`;
+    else if(!e2) chips+=`<span class="only-tag only-a">A only</span>`;
+    return `<div class="si${k===selKey?' sel':''}" onclick="select('${k}')"><div class="si-q">${hx(getQuery(k))}</div><div class="si-chips">${chips}</div></div>`;
+  }).join('');
+}
+
+// ─── SELECT + RENDER COMPARISON ───────────────────────────────────────────
+function select(k){
+  selKey=k;
+  renderList();
+  document.getElementById('tl-id').textContent='ID: '+k.substring(0,10)+'…';
+  renderCmp(k);
+}
+
+function renderCmp(k){
+  const e1=D1&&D1.entries?D1.entries[k]:null;
+  const e2=D2&&D2.entries?D2.entries[k]:null;
+  const base=e1||e2;
+  const query=base.query;
+  const mems=base.memories||[];
+  const ft=base.failure_type;
+
+  // Shared query
+  let h=`<div class="sec">
+    <div class="sec-hdr cyan">▶ Query ${ft?`<span class="fail-badge ${ft==='cross_domain'?'fail-cross':ft==='none'?'fail-none':'fail-other'}">${hx(ft)}</span>`:''}
+    </div>
+    <div class="sec-body"><div class="query-txt">${hx(query)}</div></div>
+  </div>`;
+
+  // Shared memories
+  const parsedA=parseMems(e1?e1.memories:mems);
+  const parsedB=parseMems(e2?e2.memories:mems);
+  // Show raw memories using whichever has unpartitioned, else show with categories
+  const rawMems=getRawMems(mems);
+  h+=`<div class="sec">
+    <div class="sec-hdr purple">◈ Memory Bank <span style="margin-left:auto;font-size:8px;color:var(--text-dim)">${rawMems.length} memories</span></div>
+    <div class="sec-body"><div class="mem-list">${rawMems.map(m=>`<div class="mem-item"><span class="mem-dot">◆</span><span>${renderMem(m)}</span></div>`).join('')}</div></div>
+  </div>`;
+
+  // Model comparison
+  const models=[...new Set([...Object.keys((e1&&e1.results)||{}),...Object.keys((e2&&e2.results)||{})])];
+  h+=`<div class="sec">
+    <div class="sec-hdr green">⊞ Model Results <span style="margin-left:auto;font-size:8px;color:var(--text-dim)">worst-scoring run shown</span></div>
+    <div class="sec-body" style="padding:12px">`;
+
+  for(const model of models){
+    h+=`<div class="model-section">
+      <div class="model-row-hdr">◉ ${hx(model)}</div>
+      <div class="cmp-grid">
+        ${renderFilepanel(e1,model,1,N1,parsedA)}
+        ${renderFilepanel(e2,model,2,N2,parsedB)}
+      </div>
+    </div>`;
+  }
+  h+=`</div></div>`;
+  document.getElementById('cmp-body').innerHTML=h;
+}
+
+function renderFilepanel(entry,model,fn,fname,memParsed){
+  const isB=fn===2;
+  const cls=isB?'fp b':'fp';
+  const shortName=fname.replace('.json','');
+  const letter=isB?'B':'A';
+  if(!entry||!entry.results||!entry.results[model]){
+    return `<div class="${cls}">
+      <div class="fp-hdr"><span class="fp-name">File ${letter}: ${hx(shortName)}</span></div>
+      <div class="not-found"><div class="not-found-ico">⊘</div>Not in this file</div>
+    </div>`;
+  }
+  const md=entry.results[model];
+  const gen=worstGen(md.generations);
+  const sc=gen&&gen.judge?gen.judge.score:null;
+  const runs=(md.generations||[]).length;
+  const resp=gen?gen.memory_response:'';
+  const reason=gen&&gen.judge?gen.judge.reasoning:'';
+
+  // Memory partitions for this file
+  let partHtml='';
+  if(memParsed.partitioned){
+    partHtml=`<div style="margin-bottom:12px"><div class="part-hdr">Memory Partitions</div>`;
+    for(const[cat,items]of Object.entries(memParsed.partitions)){
+      partHtml+=`<div class="part-group">
+        <span class="part-cat cat-badge ${catCls(cat)}">${hx(cat)}</span>
+        <div class="part-mems">${items.map(i=>`<div class="part-mem">• ${hx(i)}</div>`).join('')}</div>
+      </div>`;
+    }
+    partHtml+='</div>';
+  }
+
+  return `<div class="${cls}">
+    <div class="fp-hdr">
+      <span class="fp-name">File ${letter}: ${hx(shortName)}</span>
+      <div style="display:flex;align-items:center;gap:7px">
+        <span class="runs-tag">${runs} run${runs!==1?'s':''}</span>
+        ${sc!==null?`<div class="fp-score"><span class="score-big s${sc}">${sc}</span><span class="score-denom">/5</span></div>`:''}
+      </div>
+    </div>
+    <div class="fp-body">
+      ${partHtml}
+      <div class="resp-lbl">Response</div>
+      <div class="resp-box">${md2html(resp)}</div>
+      ${reason?`<div class="judge-box"><div class="judge-lbl">⊛ Judge Reasoning</div><div class="judge-txt">${hx(reason)}</div></div>`:''}
+    </div>
+  </div>`;
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────
+function hx(s){
+  if(!s)return'';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function md2html(t){
+  if(!t)return'';
+  let h=hx(t);
+  h=h.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  h=h.replace(/^#{1,3} (.+)$/gm,'<strong style="color:var(--cyan)">$1</strong>');
+  h=h.replace(/\n/g,'<br>');
+  return h;
+}
+function worstGen(gens){
+  if(!gens||!gens.length)return null;
+  let w=gens[0];
+  for(const g of gens) if(g.judge&&w.judge&&(g.judge.score||0)>(w.judge.score||0)) w=g;
+  return w;
+}
+// Parse memories: detect "category: content" format
+function parseMems(mems){
+  if(!mems||!mems.length)return{partitioned:false,raw:[],partitions:{}};
+  const pattern=/^(\w+):\s+(.+)$/s;
+  const partitions={};
+  let partitioned=false;
+  for(const m of mems){
+    const match=m.match(pattern);
+    if(match){
+      partitioned=true;
+      const cat=match[1].toLowerCase();
+      const body=match[2];
+      if(!partitions[cat])partitions[cat]=[];
+      // split multiple memories in one category string: split on "., " before capital or "User"
+      const items=body.split(/\.,\s+(?=[A-Z])/);
+      items.forEach((item,i)=>{
+        const cleaned=(i<items.length-1?item+'.':item).trim();
+        if(cleaned) partitions[cat].push(cleaned);
+      });
+    }
+  }
+  return{partitioned,raw:mems,partitions};
+}
+// Get flat raw memories (strip category prefixes for shared display)
+function getRawMems(mems){
+  if(!mems)return[];
+  return mems.map(m=>{
+    const match=m.match(/^(\w+):\s+(.+)$/s);
+    return match?{cat:match[1],text:match[2]}:{cat:null,text:m};
+  });
+}
+function renderMem(m){
+  if(m.cat){
+    return`<span class="cat-badge ${catCls(m.cat)}">${hx(m.cat)}</span>${hx(m.text)}`;
+  }
+  return hx(m.text);
+}
+function catCls(c){
+  const map={health:'c-health',personal:'c-personal',education:'c-education',work:'c-work',finance:'c-finance',relationships:'c-relationships',social:'c-social'};
+  return map[(c||'').toLowerCase()]||'c-other';
+}
+</script>
+</body>
+</html>
