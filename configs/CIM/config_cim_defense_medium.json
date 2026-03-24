@@ -1,0 +1,17 @@
+{
+    "input": "benchmark_samples/full_benchmark.jsonl",
+    "output": "outputs/CIM/cim_defense_medium.json",
+    "dataset": "cim",
+    "prompt_template": "prompts/defensive/cim_defense_medium.txt",
+    "memory_mode": "full_profile",
+    "cim_labels_file": "outputs/CIM/cim_labels.json",
+    "concurrency": 5,
+    "models": [
+      {
+        "name": "meta/llama-3.3-70b-instruct-maas",
+        "provider": "vertexai",
+        "mode": "batch",
+        "api_params": {"location": "us-central1", "max_output_tokens": 1024}
+      }
+    ]
+}

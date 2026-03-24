@@ -195,6 +195,7 @@ def load_benchmark_config_data(
     if (
         config.prompt_template_content
         and "{memories}" not in config.prompt_template_content
+        and config.dataset not in ("cim", "both")
     ):
         raise ValueError(
             "Prompt template must contain the {memories} placeholder. "

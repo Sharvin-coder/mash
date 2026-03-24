@@ -155,6 +155,10 @@ def samples_to_input_entries(
             entry["required_attributes"] = sample.required_attributes
             entry["forbidden_attributes"] = sample.forbidden_attributes
             entry["cim_metadata"] = sample.metadata
+            if "cim_task" in sample.metadata:
+                entry["cim_task"] = sample.metadata["cim_task"]
+            if "cim_recipient" in sample.metadata:
+                entry["cim_recipient"] = sample.metadata["cim_recipient"]
         entries.append(entry)
     return entries
 
@@ -189,7 +193,8 @@ def _hydrate_checkpoint_entry(
         }
         # Preserve CIM-specific fields so checkpoint resume keeps them
         if resolved_leak == "cim":
-            for key in ("required_attributes", "forbidden_attributes", "cim_metadata"):
+            for key in ("required_attributes", "forbidden_attributes", "cim_metadata",
+                        "cim_task", "cim_recipient"):
                 if key in entry:
                     entry_data[key] = entry[key]
         # Persist model affinity (partitioned mode) as a sorted list for JSON compatibility

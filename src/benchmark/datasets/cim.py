@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import warnings
 from collections import defaultdict
 from pathlib import Path
@@ -11,6 +12,24 @@ from typing import Iterator
 
 from benchmark.datasets import Sample
 from benchmark.exceptions import FatalBenchmarkError
+
+# Matches the task instruction at the end of every CIM HuggingFace prompt, e.g.:
+#   "Write a complete message to psychiatrist to achieve the following purpose: Medication evaluation appointment."
+_TASK_PATTERN = re.compile(
+    r"Write a(?:n)? (?:complete )?message to (.+?) to achieve the following purpose: (.+?)\.",
+    re.IGNORECASE,
+)
+
+
+def parse_cim_task_recipient(prompt: str) -> tuple[str, str] | None:
+    """Extract (recipient, task) from a CIM HuggingFace prompt string.
+
+    Returns None if the pattern is not found.
+    """
+    m = _TASK_PATTERN.search(prompt)
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+    return None
 
 
 class CIMDataset:
@@ -125,17 +144,23 @@ class CIMDataset:
                 r["attribute"]: r["memory_statement"] for r in rows
             }
 
+            cim_meta: dict = {
+                "failure_type": "cim",
+                "name": name,
+                "attribute_memory_map": attribute_memory_map,
+            }
+            parsed = parse_cim_task_recipient(prompt)
+            if parsed:
+                cim_meta["cim_task"] = parsed[1]
+                cim_meta["cim_recipient"] = parsed[0]
+
             yield Sample(
                 sample_id=sample_id,
                 prompt=prompt,
                 memories=memories,
                 required_attributes=required_attrs,
                 forbidden_attributes=forbidden_attrs,
-                metadata={
-                    "failure_type": "cim",
-                    "name": name,
-                    "attribute_memory_map": attribute_memory_map,
-                },
+                metadata=cim_meta,
             )
 
     def _select_memories(self, rows: list[dict]) -> list[str]:

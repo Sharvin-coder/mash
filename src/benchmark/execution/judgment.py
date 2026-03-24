@@ -507,7 +507,7 @@ async def judge_response_cim(
                 provider="gemini",
                 api_params={
                     "temperature": JUDGE_TEMPERATURE,
-                    "max_output_tokens": 4096,
+                    "max_output_tokens": 16384,
                     "response_mime_type": "application/json",
                 },
             )

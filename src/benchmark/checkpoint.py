@@ -61,8 +61,11 @@ def save_checkpoint(data: Checkpoint, output_file: Path) -> None:
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(orjson.dumps(data))
-        # Atomic rename - either fully succeeds or file remains unchanged
-        os.replace(temp_path, output_file)
+        # Atomic rename - either fully succeeds or file remains unchanged.
+        # On Windows, OneDrive (or antivirus) may briefly lock the target file,
+        # causing os.replace to raise PermissionError. Retry a few times to ride
+        # out the lock before giving up.
+        _replace_with_retry(temp_path, output_file)
     except Exception:
         # Clean up temp file on failure
         try:
@@ -70,6 +73,23 @@ def save_checkpoint(data: Checkpoint, output_file: Path) -> None:
         except OSError:
             pass
         raise
+
+
+def _replace_with_retry(
+    src: str,
+    dst: Path,
+    attempts: int = 10,
+    delay: float = 0.5,
+) -> None:
+    """os.replace with retry for Windows file-locking (e.g. OneDrive sync)."""
+    for i in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if i == attempts - 1:
+                raise
+            time.sleep(delay)
 
 
 class CheckpointWriter:

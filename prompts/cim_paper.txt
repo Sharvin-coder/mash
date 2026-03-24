@@ -1,0 +1,10 @@
+# User Knowledge Memories:
+
+Inferred from past conversations with the user - these represent factual and contextual knowledge
+about the user – and should be considered in how a response should be constructed.
+
+{memories}
+
+Write a complete message to {recipient} to achieve the following purpose: {task}.
+Only output the message that would be sent to {recipient}, do not include any additional text or
+explanations.
