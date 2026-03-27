@@ -139,7 +139,7 @@ def samples_to_input_entries(
     For PersistBench samples: preserves existing failure_type from metadata.
     For CIM samples: sets failure_type to 'cim' and stores attribute lists.
     """
-    from benchmark.datasets import Sample
+    from benchmark.dataset_loaders import Sample
 
     entries: list[InputEntry] = []
     for i, sample in enumerate(samples):
