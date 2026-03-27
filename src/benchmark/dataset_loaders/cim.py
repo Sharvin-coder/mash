@@ -10,7 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Iterator
 
-from benchmark.datasets import Sample
+from benchmark.dataset_loaders import Sample
 from benchmark.exceptions import FatalBenchmarkError
 
 # Matches the task instruction at the end of every CIM HuggingFace prompt, e.g.:
@@ -71,7 +71,7 @@ class CIMDataset:
         self._labels: dict[str, str | None] | None = None
 
         if labels_file is not None:
-            from benchmark.datasets.cim_labeler import load_labels_file
+            from benchmark.dataset_loaders.cim_labeler import load_labels_file
 
             self._labels = load_labels_file(labels_file)
             labeled_count = sum(1 for v in self._labels.values() if v is not None)

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Iterator
 
 from benchmark.config import resolve_entry_configuration
-from benchmark.datasets import Sample
+from benchmark.dataset_loaders import Sample
 from benchmark.utils import generate_hash_id
 from benchmark.work_planner import load_input_file
 
