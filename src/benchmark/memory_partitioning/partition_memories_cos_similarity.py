@@ -31,7 +31,7 @@ MODEL_NAME = "BAAI/bge-large-en-v1.5"
 # ── RUN CONFIG ────────────────────────────────────────────────────────────────
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 INPUT_FILE  = _PROJECT_ROOT / "benchmark_samples/persistbench/baseline/cross_domain_and_beneficial.jsonl"
-OUTPUT_FILE = _PROJECT_ROOT / "benchmark_samples/persistbench/partitioned_cos_similarity/full_benchmark.jsonl"
+OUTPUT_FILE = _PROJECT_ROOT / "benchmark_samples/persistbench/partitioned/cos_similarity/full_benchmark.jsonl"
 # ──────────────────────────────────────────────────────────────────────────────
 
 # ── CATEGORIES ────────────────────────────────────────────────────────────────
