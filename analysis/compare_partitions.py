@@ -24,7 +24,7 @@ from collections import defaultdict
 from itertools import combinations
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-PARTITIONED_DIR = REPO_ROOT / "benchmark_samples" / "partitioned_custom_categories"
+PARTITIONED_DIR = REPO_ROOT / "benchmark_samples" / "persistbench" / "partitioned_custom_categories"
 
 DEFAULT_CATEGORIES = [
     "personal", "education", "employment", "finance", "housing",

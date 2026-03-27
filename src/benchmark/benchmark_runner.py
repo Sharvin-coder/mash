@@ -193,7 +193,7 @@ def _prepare_benchmark_execution(
 
 def _load_cim_entries(config: BenchmarkConfig) -> list[InputEntry]:
     """Load entries from CIM dataset."""
-    from benchmark.datasets.cim import CIMDataset
+    from benchmark.dataset_loaders.cim import CIMDataset
 
     dataset_id = config.cim_path or "facebook/CIMemories"
     cim_dataset = CIMDataset(

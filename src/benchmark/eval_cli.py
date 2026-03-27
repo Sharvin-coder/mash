@@ -167,7 +167,7 @@ async def _handle(args: argparse.Namespace) -> int:
     is_cim = effective_dataset in ("cim", "both")
     if is_cim and args.auto_label and not cim_labels:
         from pathlib import Path as _Path
-        from benchmark.datasets.cim_labeler import LabelingConfig, run_labeling
+        from benchmark.dataset_loaders.cim_labeler import LabelingConfig, run_labeling
 
         default_labels_path = _Path("outputs/cim_labels.json")
         if not default_labels_path.exists():
@@ -337,7 +337,7 @@ async def main_async() -> int:
 
     if args.subcommand == "cim-label":
         from pathlib import Path
-        from benchmark.datasets.cim_labeler import LabelingConfig, run_labeling, load_cim_groups, aggregate_labels, save_labels, _load_checkpoint
+        from benchmark.dataset_loaders.cim_labeler import LabelingConfig, run_labeling, load_cim_groups, aggregate_labels, save_labels, _load_checkpoint
 
         config = LabelingConfig(
             dataset_id=args.dataset_id,
