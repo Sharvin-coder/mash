@@ -1,0 +1,38 @@
+{
+  
+  "models": [
+ 
+    {
+      "name": "meta/llama-3.3-70b-instruct-maas",
+      "provider": "vertexai",
+      "mode": "batch",
+      "input": "benchmark_samples/persistbench/partitioned_custom_categories/llama3p3_70b/full_benchmark.jsonl",
+      "api_params": {
+        "location": "us-central1",
+        "max_output_tokens": 1024
+      }
+    },
+
+    {
+      "name": "qwen/qwen3-235b-a22b-instruct-2507-maas",
+      "provider": "vertexai",
+      "mode": "batch",
+      "input": "benchmark_samples/persistbench/partitioned_custom_categories/qwen3_235b/full_benchmark.jsonl",
+      "api_params": {
+        "location": "us-south1",
+        "max_output_tokens": 1024
+      }
+    }
+  ],
+
+  "judge_model": "moonshotai/kimi-k2-thinking-maas",
+  "judge_provider": "vertexai",
+  "judge_api_params": {
+    "temperature": 0
+  },
+  
+  "method": "partitioned",
+  "input": "benchmark_samples/full_benchmark.jsonl",
+  "output": "outputs/persistbench/partitioned_custom_categories/persist_full_partitioned_model_custom_llama3p3_70b_qwen3_235b.json",
+  "concurrency": 50
+}

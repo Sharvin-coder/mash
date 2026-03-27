@@ -53,9 +53,9 @@ from benchmark.work_planner import (
 Checkpoint: TypeAlias = dict[str, Any]
 
 # Run-level retry defaults
-RUN_RETRY_MAX_ATTEMPTS = 3
+RUN_RETRY_MAX_ATTEMPTS = 5
 RUN_RETRY_DELAY_SECONDS = 30
-RUN_RETRY_CONCURRENCY_FACTOR = 0.7
+RUN_RETRY_CONCURRENCY_FACTOR = 0.5
 
 
 def _load_json_file(file_path: Path) -> tuple[dict[str, Any], bool]:
