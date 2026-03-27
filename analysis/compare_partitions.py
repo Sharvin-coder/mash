@@ -24,12 +24,13 @@ from collections import defaultdict
 from itertools import combinations
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-PARTITIONED_DIR = REPO_ROOT / "benchmark_samples" / "partitioned"
+PARTITIONED_DIR = REPO_ROOT / "benchmark_samples" / "partitioned_custom_categories"
 
-CATEGORIES = [
+DEFAULT_CATEGORIES = [
     "personal", "education", "employment", "finance", "housing",
     "legal", "health", "schedule", "identity", "social", "romantic",
 ]
+_DEFAULT_CAT_SET = set(DEFAULT_CATEGORIES)
 
 
 # ---------------------------------------------------------------------------
@@ -60,18 +61,30 @@ def load_entries(path: pathlib.Path) -> dict[str, dict]:
     return entries
 
 
+def collect_categories(all_entries: dict[str, dict[str, dict]]) -> list[str]:
+    """Return a stable category list: DEFAULT_CATEGORIES first, then any
+    model-created custom categories found in the data (sorted alphabetically)."""
+    custom: set[str] = set()
+    for entries in all_entries.values():
+        for entry in entries.values():
+            mems = entry.get("memories", {})
+            if isinstance(mems, dict):
+                custom.update(k for k in mems if k not in _DEFAULT_CAT_SET)
+    return DEFAULT_CATEGORIES + sorted(custom)
+
+
 # ---------------------------------------------------------------------------
 # Per-model stats
 # ---------------------------------------------------------------------------
 
-def category_fill_stats(entries: dict[str, dict]) -> dict[str, dict]:
+def category_fill_stats(entries: dict[str, dict], categories: list[str]) -> dict[str, dict]:
     """For each category: total non-empty entries and total memory items."""
-    stats: dict[str, dict] = {c: {"entries_with_content": 0, "total_items": 0} for c in CATEGORIES}
+    stats: dict[str, dict] = {c: {"entries_with_content": 0, "total_items": 0} for c in categories}
     for entry in entries.values():
         mems = entry.get("memories", {})
         if not isinstance(mems, dict):
             continue
-        for cat in CATEGORIES:
+        for cat in categories:
             items = mems.get(cat) or []
             if items:
                 stats[cat]["entries_with_content"] += 1
@@ -86,13 +99,14 @@ def category_fill_stats(entries: dict[str, dict]) -> dict[str, dict]:
 def pairwise_diff(
     entries_a: dict[str, dict],
     entries_b: dict[str, dict],
+    categories: list[str],
 ) -> dict:
     """Compare two models' entries over their shared hash_ids."""
     shared_ids = set(entries_a) & set(entries_b)
 
     cat_stats: dict[str, dict[str, int]] = {
         c: {"a_only": 0, "b_only": 0, "both": 0, "neither": 0}
-        for c in CATEGORIES
+        for c in categories
     }
 
     content_diffs = 0  # entries where any category has different items (ignoring order)
@@ -110,7 +124,7 @@ def pairwise_diff(
         entry_has_withheld = False
         diff_cats = []
 
-        for cat in CATEGORIES:
+        for cat in categories:
             items_a = set(mems_a.get(cat) or [])
             items_b = set(mems_b.get(cat) or [])
 
@@ -165,28 +179,29 @@ def _bar(n: int, total: int, width: int = 20) -> str:
     return "#" * filled + "." * (width - filled)
 
 
-def print_model_summary(model: str, entries: dict) -> None:
-    stats = category_fill_stats(entries)
+def print_model_summary(model: str, entries: dict, categories: list[str]) -> None:
+    stats = category_fill_stats(entries, categories)
     n = len(entries)
     print(f"\n  {model}  ({n} entries)")
     print(f"  {'Category':<14}  {'Filled':>7}  {'%':>5}  {'Items':>6}  bar")
     print(f"  {'-'*14}  {'-'*7}  {'-'*5}  {'-'*6}  {'-'*20}")
-    for cat in CATEGORIES:
+    for cat in categories:
         s = stats[cat]
         filled = s["entries_with_content"]
         pct = filled / n * 100 if n else 0
         bar = _bar(filled, n)
-        print(f"  {cat:<14}  {filled:>7}  {pct:>4.1f}%  {s['total_items']:>6}  {bar}")
+        marker = "*" if cat not in _DEFAULT_CAT_SET else " "
+        print(f"  {cat:<14}{marker} {filled:>7}  {pct:>4.1f}%  {s['total_items']:>6}  {bar}")
 
 
 def print_pairwise(name_a: str, name_b: str, diff: dict, verbose: bool) -> None:
     n = diff["shared_entries"]
     print(f"\n  {'Category':<14}  {'A-only':>7}  {'B-only':>7}  {'Both':>7}  {'Neither':>8}")
     print(f"  {'-'*14}  {'-'*7}  {'-'*7}  {'-'*7}  {'-'*8}")
-    for cat in CATEGORIES:
-        s = diff["category_stats"][cat]
+    for cat, s in diff["category_stats"].items():
+        marker = "*" if cat not in _DEFAULT_CAT_SET else " "
         print(
-            f"  {cat:<14}  {s['a_only']:>7}  {s['b_only']:>7}  {s['both']:>7}  {s['neither']:>8}"
+            f"  {cat:<14}{marker} {s['a_only']:>7}  {s['b_only']:>7}  {s['both']:>7}  {s['neither']:>8}"
         )
     print()
     if n:
@@ -201,16 +216,22 @@ def print_pairwise(name_a: str, name_b: str, diff: dict, verbose: bool) -> None:
             print(f"      differing categories: {', '.join(ex['diff_categories'])}")
 
 
-def print_coverage_matrix(model_names: list[str], all_entries: dict[str, dict[str, dict]]) -> None:
+def print_coverage_matrix(
+    model_names: list[str],
+    all_entries: dict[str, dict[str, dict]],
+    categories: list[str],
+) -> None:
     """For each category, show what % of entries each model covers."""
     col_w = max(len(m) for m in model_names) + 2
     print(f"\n  Coverage matrix  (% entries with content per category)")
-    header = f"  {'Category':<14}" + "".join(f"  {m[:col_w]:<{col_w}}" for m in model_names)
+    print(f"  (* = model-created custom category)")
+    header = f"  {'Category':<15}" + "".join(f"  {m[:col_w]:<{col_w}}" for m in model_names)
     print(header)
-    print("  " + "-" * (14 + (col_w + 2) * len(model_names)))
+    print("  " + "-" * (15 + (col_w + 2) * len(model_names)))
 
-    for cat in CATEGORIES:
-        row = f"  {cat:<14}"
+    for cat in categories:
+        marker = "*" if cat not in _DEFAULT_CAT_SET else " "
+        row = f"  {cat:<14}{marker}"
         for m in model_names:
             entries = all_entries[m]
             covered = sum(
@@ -262,19 +283,25 @@ def main() -> None:
     }
     model_names = [n for n, _ in available]
 
+    # Compute the union of all categories (default + any custom) across models.
+    categories = collect_categories(all_entries)
+    custom_cats = [c for c in categories if c not in _DEFAULT_CAT_SET]
+    if custom_cats:
+        print(f"Custom categories found: {custom_cats}")
+
     # ── Per-model summaries ──────────────────────────────────────────────────
     print(f"\n{'='*70}")
     print("PER-MODEL CATEGORY FILL")
     print(f"{'='*70}")
     for model_name in model_names:
-        print_model_summary(model_name, all_entries[model_name])
+        print_model_summary(model_name, all_entries[model_name], categories)
 
     # ── Coverage matrix ──────────────────────────────────────────────────────
     if len(model_names) > 1:
         print(f"\n{'='*70}")
         print("COVERAGE MATRIX")
         print(f"{'='*70}")
-        print_coverage_matrix(model_names, all_entries)
+        print_coverage_matrix(model_names, all_entries, categories)
 
     # ── Pairwise comparisons ─────────────────────────────────────────────────
     if len(model_names) > 1:
@@ -284,7 +311,7 @@ def main() -> None:
         for a, b in combinations(model_names, 2):
             print(f"\n  A = {a}")
             print(f"  B = {b}")
-            diff = pairwise_diff(all_entries[a], all_entries[b])
+            diff = pairwise_diff(all_entries[a], all_entries[b], categories)
             print_pairwise(a, b, diff, args.verbose)
 
     print()
