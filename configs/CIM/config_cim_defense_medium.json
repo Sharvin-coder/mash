@@ -1,10 +1,11 @@
 {
     "input": "benchmark_samples/full_benchmark.jsonl",
-    "output": "outputs/CIM/cim_defense_medium.json",
+    "output": "outputs/CIM/cim_defense_medium_kimi.json",
     "dataset": "cim",
     "prompt_template": "prompts/defensive/cim_defense_medium.txt",
     "memory_mode": "full_profile",
     "cim_labels_file": "outputs/CIM/cim_labels.json",
+    "judge_provider": "vertexai",
     "concurrency": 5,
     "models": [
       {

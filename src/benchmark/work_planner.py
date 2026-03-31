@@ -123,6 +123,12 @@ def load_and_validate_entries(input_file: Path) -> list[InputEntry]:
             "original_index": i,
             "failure_type": failure_type,
         }
+        # Preserve CIM-specific fields so judges can evaluate them after JSONL load
+        if failure_type == "cim":
+            for key in ("required_attributes", "forbidden_attributes",
+                        "cim_metadata", "cim_task", "cim_recipient"):
+                if key in raw_entry:
+                    entry_data[key] = raw_entry[key]
         input_entries.append(entry_data)
 
     if not input_entries:

@@ -273,10 +273,10 @@ def _load_from_file(
                 f"Combined dataset: {len(pb_entries)} PersistBench + "
                 f"{len(cim_entries)} CIM = {len(entries)} total entries"
             )
-        elif effective_dataset == "cim":
-            entries = _load_cim_entries(config)
         elif config.method == "partitioned":
             entries = _load_partitioned_entries(config)
+        elif effective_dataset == "cim":
+            entries = _load_cim_entries(config)
         else:
             entries = load_and_validate_entries(config.input)
         is_fresh_config = True

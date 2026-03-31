@@ -1,0 +1,21 @@
+{
+    "input": "benchmark_samples/full_benchmark.jsonl",
+    "output": "outputs/CIM/cim_partitioned.json",
+    "dataset": "cim",
+    "method": "partitioned",
+    "prompt_template": "prompts/cim_paper.txt",
+    "memory_mode": "full_profile",
+    "cim_labels_file": "outputs/CIM/cim_labels.json",
+    "judge_provider": "vertexai",
+    "concurrency": 5,
+    "models": [
+      {
+        "name": "meta/llama-3.3-70b-instruct-maas",
+        "provider": "vertexai",
+        "mode": "batch",
+        "api_params": {"location": "us-central1", "max_output_tokens":
+  1024},
+        "input": "benchmark_samples/cim/partitioned/llama3p3_70b/cim.jsonl"
+      }
+    ]
+  }
