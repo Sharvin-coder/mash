@@ -41,7 +41,6 @@ def _normalize_memories(memories: list[str] | dict[str, list[str]]) -> list[str]
         return [
             f"{category}: {', '.join(mems)}"
             for category, mems in memories.items()
-            if mems
         ]
     return list(memories)
 
