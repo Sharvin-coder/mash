@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CIM // Privacy Inspector & Comparator</title>
+<style>
+:root {
+  --bg0: #030810;
+  --bg1: #060d1a;
+  --bg2: #0a1422;
+  --bg3: #0f1c30;
+  --cyan: #00e5ff;
+  --cyan-dim: #0097a7;
+  --purple: #b57bee;
+  --purple-dim: #7b52a8;
+  --green: #00ffa3;
+  --green-dim: #00b070;
+  --orange: #ff7043;
+  --yellow: #ffd54f;
+  --red: #ff4444;
+  --red-dim: #cc2222;
+  --text: #c8ddf5;
+  --text-dim: #5a7a9a;
+  --text-muted: #2a4060;
+  --border: rgba(0,229,255,.12);
+  /* file A = cyan, file B = purple */
+  --ca: #00e5ff;
+  --cb: #b57bee;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body {
+  background: var(--bg0);
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  height: 100vh;
+  overflow: hidden;
+  background-image:
+    linear-gradient(rgba(0,229,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,.018) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+body::after {
+  content:'';
+  position:fixed; inset:0;
+  background: repeating-linear-gradient(0deg,rgba(0,0,0,.07) 0,rgba(0,0,0,.07) 1px,transparent 1px,transparent 3px);
+  pointer-events:none; z-index:9999;
+}
+
+/* ─── HEADER ─────────────────────────────────────── */
+#hdr {
+  height:54px;
+  background: linear-gradient(90deg,#04091a,#080f24 60%,#04091a);
+  border-bottom:1px solid rgba(0,229,255,.2);
+  box-shadow:0 0 60px rgba(0,229,255,.06);
+  display:flex; align-items:center; padding:0 20px; gap:12px;
+  position:relative; z-index:100;
+}
+.logo{font-size:16px;font-weight:bold;letter-spacing:5px;color:var(--cyan);text-shadow:0 0 25px var(--cyan);}
+.logo em{color:var(--red);font-style:normal;text-shadow:0 0 20px var(--red);}
+.logo-sub{font-size:8px;color:var(--text-dim);letter-spacing:3px;text-transform:uppercase;margin-top:3px;}
+.hdr-sep{width:1px;height:30px;background:var(--border);}
+.hdr-badge{font-size:8px;letter-spacing:2px;text-transform:uppercase;padding:3px 10px;border-radius:2px;background:rgba(255,68,68,.08);border:1px solid rgba(255,68,68,.25);color:var(--red);}
+.pulse-ring{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);animation:pulse 2.5s ease-in-out infinite;margin-left:auto;}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 12px var(--green);}50%{opacity:.3;box-shadow:0 0 4px var(--green);}}
+#btn-back{display:none;background:none;border:1px solid rgba(0,229,255,.25);color:var(--text-dim);padding:4px 14px;font-family:inherit;font-size:8px;letter-spacing:2px;cursor:pointer;border-radius:2px;text-transform:uppercase;transition:.2s;margin-left:8px;}
+#btn-back:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 14px rgba(0,229,255,.2);}
+.hdr-files{display:flex;align-items:center;gap:8px;font-size:9px;}
+.hdr-file-a{color:var(--ca);padding:2px 8px;border:1px solid rgba(0,229,255,.25);border-radius:2px;background:rgba(0,229,255,.05);}
+.hdr-file-b{color:var(--cb);padding:2px 8px;border:1px solid rgba(181,123,238,.3);border-radius:2px;background:rgba(181,123,238,.05);}
+.hdr-vs{color:var(--text-muted);font-size:9px;}
+
+/* ─── UPLOAD SCREEN ──────────────────────────────── */
+#scr-upload {
+  height:calc(100vh - 54px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:36px;
+}
+.up-title{font-size:26px;color:var(--cyan);letter-spacing:6px;text-transform:uppercase;text-shadow:0 0 40px var(--cyan);}
+.up-title em{color:var(--red);font-style:normal;text-shadow:0 0 30px var(--red);}
+.up-sub{font-size:10px;color:var(--text-dim);letter-spacing:3px;margin-top:8px;text-align:center;}
+.up-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+.up-col-lbl{font-size:10px;letter-spacing:3px;text-transform:uppercase;text-align:center;margin-bottom:10px;}
+.up-col-lbl.a{color:var(--ca);} .up-col-lbl.b{color:var(--cb);}
+
+.drop-zone {
+  width:340px;height:190px;
+  border:2px dashed rgba(0,229,255,.35);border-radius:10px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:.3s;background:rgba(0,229,255,.015);
+  position:relative;overflow:hidden;
+}
+.drop-zone::before{content:'';position:absolute;inset:-100%;background:conic-gradient(transparent 270deg,rgba(0,229,255,.05) 360deg);animation:spin 8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.drop-zone.b-zone{border-color:rgba(181,123,238,.4);background:rgba(181,123,238,.02);}
+.drop-zone.b-zone::before{background:conic-gradient(transparent 270deg,rgba(181,123,238,.06) 360deg);}
+.drop-zone:hover,.drop-zone.over{border-color:var(--green);background:rgba(0,255,163,.03);box-shadow:0 0 40px rgba(0,255,163,.12);}
+.drop-zone.loaded{border-style:solid;border-color:var(--green);background:rgba(0,255,163,.03);}
+.drop-inner{position:relative;z-index:1;text-align:center;padding:20px;}
+.drop-icon{font-size:42px;margin-bottom:12px;filter:drop-shadow(0 0 12px var(--cyan));}
+.b-zone .drop-icon{filter:drop-shadow(0 0 12px var(--cb));}
+.drop-lbl{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--ca);margin-bottom:6px;}
+.b-zone .drop-lbl{color:var(--cb);}
+.drop-hint{font-size:9px;color:var(--text-dim);}
+.drop-fname{font-size:9px;color:var(--green);margin-top:6px;word-break:break-all;text-shadow:0 0 8px var(--green);}
+input[type=file]{display:none;}
+
+#btn-go{background:linear-gradient(135deg,rgba(0,229,255,.08),rgba(181,123,238,.08));border:1px solid rgba(0,229,255,.4);color:var(--cyan);padding:14px 60px;font-family:inherit;font-size:13px;letter-spacing:4px;text-transform:uppercase;cursor:pointer;border-radius:4px;transition:.3s;box-shadow:0 0 30px rgba(0,229,255,.08);}
+#btn-go:hover:not(:disabled){box-shadow:0 0 50px rgba(0,229,255,.3),0 0 80px rgba(0,229,255,.1);text-shadow:0 0 15px var(--cyan);}
+#btn-go:disabled{opacity:.3;cursor:not-allowed;}
+.or-divider{font-size:9px;color:var(--text-muted);letter-spacing:3px;text-transform:uppercase;}
+
+/* ─── MAIN SCREEN ────────────────────────────────── */
+#scr-main{display:none;height:calc(100vh - 54px);flex-direction:column;overflow:hidden;}
+.stats-bar{display:flex;gap:16px;padding:6px 16px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:9px;color:var(--text-dim);letter-spacing:1px;flex-shrink:0;align-items:center;flex-wrap:wrap;}
+.stat{display:flex;align-items:center;gap:5px;}
+.stat-v{color:var(--cyan);font-weight:bold;}
+.stat-v.red{color:var(--red);} .stat-v.green{color:var(--green);} .stat-v.a{color:var(--ca);} .stat-v.b{color:var(--cb);}
+.stat-sep{width:1px;height:14px;background:var(--border);}
+.delta-tag{font-size:8px;padding:1px 6px;border-radius:3px;}
+.delta-better{background:rgba(0,255,163,.1);color:var(--green);border:1px solid rgba(0,255,163,.2);}
+.delta-worse{background:rgba(255,68,68,.1);color:var(--red);border:1px solid rgba(255,68,68,.2);}
+.delta-same{background:rgba(90,110,140,.1);color:var(--text-dim);border:1px solid rgba(90,110,140,.15);}
+
+.layout{display:grid;grid-template-columns:310px 1fr;flex:1;overflow:hidden;}
+
+/* ─── SIDEBAR ────────────────────────────────────── */
+.sidebar{background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.sb-hdr{padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:2px;color:var(--cyan);text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.sb-count{background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.2);padding:2px 8px;border-radius:10px;font-size:8px;}
+.sb-controls{padding:8px 10px;background:var(--bg2);border-bottom:1px solid rgba(0,229,255,.06);flex-shrink:0;display:flex;flex-direction:column;gap:6px;}
+.sb-controls input{width:100%;background:rgba(0,229,255,.03);border:1px solid rgba(0,229,255,.15);border-radius:3px;padding:5px 9px;color:var(--text);font-family:inherit;font-size:9px;outline:none;transition:.2s;}
+.sb-controls input:focus{border-color:var(--cyan);box-shadow:0 0 10px rgba(0,229,255,.1);}
+.sb-sort{display:flex;gap:3px;}
+.sort-btn{background:none;border:1px solid rgba(0,229,255,.12);color:var(--text-muted);padding:3px 7px;font-family:inherit;font-size:7px;letter-spacing:1px;cursor:pointer;border-radius:2px;transition:.2s;text-transform:uppercase;flex:1;}
+.sort-btn:hover,.sort-btn.on{border-color:var(--cyan);color:var(--cyan);}
+.filter-chips{display:flex;gap:4px;flex-wrap:wrap;}
+.fchip{padding:2px 8px;border-radius:10px;font-size:7px;letter-spacing:1px;cursor:pointer;transition:.15s;text-transform:uppercase;border:1px solid;}
+.fchip.all{color:var(--cyan);border-color:rgba(0,229,255,.3);background:rgba(0,229,255,.06);}
+.fchip.violated{color:var(--red);border-color:rgba(255,68,68,.3);background:rgba(255,68,68,.04);}
+.fchip.clean{color:var(--green);border-color:rgba(0,255,163,.3);background:rgba(0,255,163,.04);}
+.fchip.regressed{color:var(--orange);border-color:rgba(255,112,67,.3);background:rgba(255,112,67,.04);}
+.fchip.improved{color:var(--green);border-color:rgba(0,255,163,.3);background:rgba(0,255,163,.04);}
+.fchip.on{filter:brightness(1.4);box-shadow:0 0 10px currentColor;}
+.sample-list{flex:1;overflow-y:auto;}
+.sample-list::-webkit-scrollbar{width:3px;}
+.sample-list::-webkit-scrollbar-thumb{background:rgba(0,229,255,.15);border-radius:2px;}
+
+.si{padding:10px 12px;border-bottom:1px solid rgba(0,229,255,.04);cursor:pointer;transition:.15s;border-left:3px solid transparent;}
+.si:hover{background:rgba(0,229,255,.035);}
+.si.sel{background:rgba(0,229,255,.06);border-left-color:var(--cyan);}
+.si-name{font-size:10px;color:var(--cyan);margin-bottom:2px;font-weight:bold;letter-spacing:1px;}
+.si-task{font-size:9px;color:var(--text-dim);margin-bottom:7px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+.si-rows{display:flex;flex-direction:column;gap:4px;}
+.si-row{display:flex;align-items:center;gap:6px;}
+.si-file-lbl{font-size:7px;letter-spacing:1px;text-transform:uppercase;min-width:12px;font-weight:bold;}
+.si-file-lbl.a{color:var(--ca);} .si-file-lbl.b{color:var(--cb);}
+.si-bar{flex:1;height:3px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden;}
+.si-bar-fill{height:100%;border-radius:2px;transition:.3s;}
+.si-bar-fill.va{background:var(--ca);box-shadow:0 0 6px var(--ca);}
+.si-bar-fill.vb{background:var(--cb);box-shadow:0 0 6px var(--cb);}
+.si-bar-fill.viol{background:var(--red);box-shadow:0 0 5px var(--red);}
+.si-pct{font-size:8px;font-weight:bold;min-width:28px;text-align:right;}
+.si-pct.red{color:var(--red);} .si-pct.green{color:var(--green);}
+.si-pct.a{color:var(--ca);} .si-pct.b{color:var(--cb);}
+.si-delta{font-size:7px;font-weight:bold;padding:1px 5px;border-radius:2px;white-space:nowrap;}
+.si-delta.better{color:var(--green);background:rgba(0,255,163,.08);}
+.si-delta.worse{color:var(--red);background:rgba(255,68,68,.08);}
+.si-delta.same{color:var(--text-muted);}
+.only-tag{font-size:7px;padding:1px 6px;border-radius:3px;white-space:nowrap;}
+.only-a{background:rgba(0,229,255,.1);color:var(--ca);border:1px solid rgba(0,229,255,.25);}
+.only-b{background:rgba(181,123,238,.1);color:var(--cb);border:1px solid rgba(181,123,238,.25);}
+
+/* ─── DETAIL PANEL ───────────────────────────────── */
+.detail-panel{display:flex;flex-direction:column;overflow:hidden;background:var(--bg0);}
+.detail-toolbar{padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;font-size:9px;flex-shrink:0;}
+.tl-name{font-size:12px;font-weight:bold;color:var(--cyan);letter-spacing:2px;text-shadow:0 0 15px rgba(0,229,255,.5);}
+.tl-arrow{color:var(--text-muted);}
+.tl-task{font-size:10px;color:var(--text-dim);}
+.tl-recipient{font-size:9px;color:var(--purple);padding:2px 8px;border:1px solid rgba(181,123,238,.3);border-radius:2px;background:rgba(181,123,238,.05);}
+.tl-id{font-size:8px;color:var(--text-muted);margin-left:auto;letter-spacing:1px;}
+.detail-body{flex:1;overflow-y:auto;padding:16px;}
+.detail-body::-webkit-scrollbar{width:4px;}
+.detail-body::-webkit-scrollbar-thumb{background:rgba(0,229,255,.12);border-radius:2px;}
+
+.empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--text-muted);}
+.empty-ico{font-size:52px;opacity:.15;}
+.empty-txt{font-size:10px;letter-spacing:4px;text-transform:uppercase;opacity:.3;}
+
+/* ─── SECTIONS ───────────────────────────────────── */
+.sec{margin-bottom:18px;border:1px solid rgba(0,229,255,.1);border-radius:8px;overflow:hidden;background:var(--bg1);}
+.sec.red-theme{border-color:rgba(255,68,68,.15);}
+.sec.purple-theme{border-color:rgba(181,123,238,.15);}
+.sec.green-theme{border-color:rgba(0,255,163,.12);}
+.sec-hdr{padding:8px 14px;background:var(--bg2);border-bottom:1px solid rgba(0,229,255,.1);font-size:8px;letter-spacing:2px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.sec-hdr.cyan{color:var(--cyan);}
+.sec-hdr.purple{color:var(--purple);}
+.sec-hdr.green{color:var(--green);}
+.sec-hdr.orange{color:var(--orange);}
+.sec-hdr.red{color:var(--red);}
+.sec.purple-theme .sec-hdr{background:rgba(181,123,238,.05);border-bottom-color:rgba(181,123,238,.1);}
+.sec.green-theme .sec-hdr{background:rgba(0,255,163,.04);border-bottom-color:rgba(0,255,163,.1);}
+.sec-body{padding:14px;}
+.sec-hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.sec-count{font-size:8px;color:var(--text-muted);background:rgba(0,229,255,.05);border:1px solid var(--border);padding:1px 7px;border-radius:10px;}
+.toggle-btn{background:none;border:1px solid rgba(0,229,255,.15);color:var(--text-dim);padding:2px 10px;font-family:inherit;font-size:7px;letter-spacing:1px;cursor:pointer;border-radius:2px;text-transform:uppercase;transition:.2s;}
+.toggle-btn:hover{border-color:var(--cyan);color:var(--cyan);}
+
+/* ─── INFO GRID ──────────────────────────────────── */
+.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.info-card{padding:11px 13px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);}
+.info-card-lbl{font-size:7px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+.info-card-val{font-size:12px;color:var(--text);font-weight:bold;}
+.info-card-val.cyan{color:var(--cyan);text-shadow:0 0 10px rgba(0,229,255,.4);}
+.info-card-val.purple{color:var(--purple);}
+.info-card-val.green{color:var(--green);}
+.info-card-val.red{color:var(--red);}
+
+/* ─── QUERY / MEMORY ─────────────────────────────── */
+.query-box{font-size:10px;line-height:1.75;color:var(--text);padding:12px 14px;background:rgba(0,229,255,.02);border-left:3px solid var(--cyan);border-radius:0 4px 4px 0;max-height:260px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;scrollbar-width:thin;scrollbar-color:rgba(0,229,255,.15) transparent;}
+.query-box::-webkit-scrollbar{width:3px;}
+.query-box::-webkit-scrollbar-thumb{background:rgba(0,229,255,.15);}
+.mem-list{display:flex;flex-direction:column;gap:4px;}
+.mem-item{display:flex;align-items:flex-start;gap:8px;padding:6px 10px;font-size:10px;line-height:1.55;background:rgba(181,123,238,.03);border:1px solid rgba(181,123,238,.1);border-radius:4px;transition:.15s;}
+.mem-item:hover{background:rgba(181,123,238,.06);}
+.mem-dot{color:var(--purple);margin-top:1px;flex-shrink:0;font-size:8px;}
+.mem-idx{font-size:8px;color:var(--text-muted);min-width:18px;flex-shrink:0;}
+
+/* ─── ATTRIBUTE MAP ──────────────────────────────── */
+.attr-groups{display:flex;flex-direction:column;gap:14px;}
+.attr-group-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:8px;letter-spacing:2px;text-transform:uppercase;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,.04);}
+.attr-group-badge{padding:2px 8px;border-radius:10px;font-size:7px;font-weight:bold;letter-spacing:1px;}
+.badge-required{background:rgba(0,255,163,.12);color:var(--green);border:1px solid rgba(0,255,163,.3);}
+.badge-forbidden{background:rgba(255,68,68,.12);color:var(--red);border:1px solid rgba(255,68,68,.3);}
+.badge-neutral{background:rgba(90,110,140,.1);color:var(--text-dim);border:1px solid rgba(90,110,140,.2);}
+.attr-count{color:var(--text-muted);font-size:8px;}
+.attr-grid{display:flex;flex-direction:column;gap:4px;}
+.attr-item{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-radius:4px;font-size:10px;line-height:1.5;transition:.15s;}
+.attr-item.required{background:rgba(0,255,163,.03);border:1px solid rgba(0,255,163,.12);}
+.attr-item.forbidden{background:rgba(255,68,68,.03);border:1px solid rgba(255,68,68,.1);}
+.attr-item.neutral{background:rgba(0,229,255,.02);border:1px solid rgba(0,229,255,.07);}
+.attr-item:hover{filter:brightness(1.3);}
+.attr-id{font-size:8px;color:var(--text-muted);margin-bottom:3px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;}
+.attr-seg{padding:1px 5px;border-radius:2px;background:rgba(255,255,255,.04);color:var(--text-dim);font-size:7px;letter-spacing:.5px;}
+.attr-seg.cat0{color:var(--purple);background:rgba(181,123,238,.08);}
+.attr-seg.cat1{color:var(--cyan);background:rgba(0,229,255,.06);}
+.attr-seg.ev{color:var(--orange);background:rgba(255,112,67,.06);}
+.attr-icon{font-size:10px;flex-shrink:0;margin-top:1px;}
+.attr-text{color:var(--text);}
+
+/* ─── COMPARISON GRID ────────────────────────────── */
+.cmp-header{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+  margin-bottom:12px;
+}
+.cmp-file-hdr{
+  padding:7px 12px;border-radius:4px;
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:9px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;
+}
+.cmp-file-hdr.a{background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.25);color:var(--ca);}
+.cmp-file-hdr.b{background:rgba(181,123,238,.06);border:1px solid rgba(181,123,238,.25);color:var(--cb);}
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.model-block-hdr{font-size:8px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;padding:5px 0;border-bottom:1px solid rgba(0,229,255,.06);display:flex;align-items:center;gap:8px;}
+.model-dot{width:5px;height:5px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);}
+
+/* ─── GEN BLOCK ──────────────────────────────────── */
+.gen-block{border-radius:6px;overflow:hidden;border:1px solid rgba(0,229,255,.1);background:rgba(0,229,255,.015);margin-bottom:8px;}
+.gen-block.b-side{border-color:rgba(181,123,238,.15);background:rgba(181,123,238,.015);}
+.gen-hdr{padding:7px 11px;background:rgba(0,229,255,.05);border-bottom:1px solid rgba(0,229,255,.08);display:flex;align-items:center;justify-content:space-between;}
+.gen-block.b-side .gen-hdr{background:rgba(181,123,238,.05);border-bottom-color:rgba(181,123,238,.08);}
+.gen-label{font-size:8px;letter-spacing:2px;color:var(--ca);text-transform:uppercase;}
+.gen-block.b-side .gen-label{color:var(--cb);}
+.gen-scores{display:flex;align-items:center;gap:12px;}
+.score-meter{display:flex;align-items:center;gap:6px;}
+.score-meter-lbl{font-size:7px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);}
+.score-track{width:60px;height:4px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;}
+.score-fill{height:100%;border-radius:3px;transition:.4s;}
+.score-fill.viol{background:var(--red);box-shadow:0 0 8px var(--red);}
+.score-fill.comp{background:var(--green);box-shadow:0 0 8px var(--green);}
+.score-pct{font-size:10px;font-weight:bold;min-width:32px;text-align:right;}
+.score-pct.red{color:var(--red);text-shadow:0 0 8px rgba(255,68,68,.5);}
+.score-pct.green{color:var(--green);text-shadow:0 0 8px rgba(0,255,163,.5);}
+.gen-body{padding:11px;}
+
+.resp-lbl{font-size:7px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:7px;}
+.resp-lbl::after{content:'';flex:1;height:1px;background:rgba(0,229,255,.06);}
+.resp-box{font-size:10px;line-height:1.7;color:var(--text);background:rgba(0,0,0,.3);border:1px solid rgba(0,229,255,.06);border-radius:4px;padding:9px 11px;max-height:220px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;scrollbar-width:thin;scrollbar-color:rgba(0,229,255,.12) transparent;}
+.resp-box::-webkit-scrollbar{width:3px;}
+.resp-box::-webkit-scrollbar-thumb{background:rgba(0,229,255,.12);}
+
+.not-in-file{padding:30px 14px;text-align:center;color:var(--text-muted);font-size:10px;border:1px dashed rgba(255,255,255,.06);border-radius:6px;}
+.not-in-file-ico{font-size:26px;margin-bottom:8px;opacity:.2;}
+
+/* ─── JUDGE BREAKDOWN ────────────────────────────── */
+.attr-judge-wrap{margin-top:10px;}
+.attr-judge-lbl{font-size:7px;color:var(--orange);letter-spacing:2px;text-transform:uppercase;margin-bottom:7px;display:flex;align-items:center;gap:7px;}
+.attr-judge-lbl::after{content:'';flex:1;height:1px;background:rgba(255,112,67,.1);}
+.summary-badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.sbadge{font-size:7px;padding:2px 7px;border-radius:10px;border:1px solid;}
+.sbadge.leaked{color:var(--red);background:rgba(255,68,68,.08);border-color:rgba(255,68,68,.25);}
+.sbadge.protected{color:var(--green);background:rgba(0,255,163,.06);border-color:rgba(0,255,163,.2);}
+.sbadge.included{color:var(--green);background:rgba(0,255,163,.06);border-color:rgba(0,255,163,.2);}
+.sbadge.missing{color:var(--orange);background:rgba(255,112,67,.06);border-color:rgba(255,112,67,.2);}
+.attr-judge-list{display:flex;flex-direction:column;gap:3px;}
+.aj-row{display:flex;align-items:flex-start;gap:7px;padding:5px 9px;border-radius:4px;font-size:9px;border:1px solid transparent;transition:.15s;}
+.aj-row.revealed{background:rgba(255,68,68,.05);border-color:rgba(255,68,68,.2);}
+.aj-row.used-only{background:rgba(255,213,79,.04);border-color:rgba(255,213,79,.12);}
+.aj-row.clean{background:rgba(0,229,255,.02);border-color:rgba(0,229,255,.06);}
+.aj-row.required-miss{background:rgba(255,112,67,.04);border-color:rgba(255,112,67,.15);}
+.aj-status{font-size:7px;padding:1px 5px;border-radius:2px;font-weight:bold;letter-spacing:.5px;flex-shrink:0;margin-top:1px;white-space:nowrap;}
+.aj-status.leaked{background:rgba(255,68,68,.2);color:var(--red);border:1px solid rgba(255,68,68,.4);}
+.aj-status.used{background:rgba(255,213,79,.15);color:var(--yellow);border:1px solid rgba(255,213,79,.3);}
+.aj-status.ok{background:rgba(0,255,163,.1);color:var(--green);border:1px solid rgba(0,255,163,.25);}
+.aj-status.missing{background:rgba(255,112,67,.15);color:var(--orange);border:1px solid rgba(255,112,67,.3);}
+.aj-status.included{background:rgba(0,255,163,.12);color:var(--green);border:1px solid rgba(0,255,163,.25);}
+.aj-main{flex:1;min-width:0;}
+.aj-id{font-size:7px;color:var(--text-muted);margin-bottom:2px;display:flex;gap:3px;flex-wrap:wrap;}
+.aj-seg{font-size:7px;padding:1px 4px;border-radius:2px;background:rgba(255,255,255,.04);color:var(--text-dim);}
+.aj-evidence{font-size:8px;color:var(--orange);margin-top:2px;font-style:italic;line-height:1.5;word-break:break-word;}
+.aj-badge{font-size:6px;padding:1px 4px;border-radius:2px;flex-shrink:0;margin-top:2px;white-space:nowrap;}
+.aj-badge.req{background:rgba(0,255,163,.08);color:var(--green-dim);border:1px solid rgba(0,255,163,.2);}
+.aj-badge.forb{background:rgba(255,68,68,.08);color:var(--red-dim);border:1px solid rgba(255,68,68,.2);}
+
+/* ─── DELTA DISPLAY ──────────────────────────────── */
+.delta-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:4px;margin-bottom:10px;font-size:9px;}
+.delta-row.improved{background:rgba(0,255,163,.05);border:1px solid rgba(0,255,163,.15);}
+.delta-row.worsened{background:rgba(255,68,68,.05);border:1px solid rgba(255,68,68,.15);}
+.delta-row.unchanged{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);}
+.delta-icon{font-size:14px;}
+.delta-text{color:var(--text);}
+.delta-val{font-weight:bold;}
+
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(0,229,255,.12);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="hdr">
+  <div>
+    <div class="logo">CIM<em>INSPECT</em></div>
+    <div class="logo-sub">Contextual Integrity Monitor</div>
+  </div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-badge">PRIVACY ANALYSIS</div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-files" id="hdr-files" style="display:none">
+    <span class="hdr-file-a" id="hdr-fa">File A</span>
+    <span class="hdr-vs">vs</span>
+    <span class="hdr-file-b" id="hdr-fb">File B</span>
+  </div>
+  <div class="pulse-ring"></div>
+  <button id="btn-back" onclick="showUpload()">◄ Reset</button>
+</div>
+
+<!-- UPLOAD SCREEN -->
+<div id="scr-upload">
+  <div>
+    <div class="up-title">CIM <em>Inspector</em></div>
+    <div class="up-sub">Load one or two CIM output files — single view or side-by-side comparison</div>
+  </div>
+  <div class="up-grid">
+    <div>
+      <div class="up-col-lbl a">File A &nbsp;<span style="font-size:8px;color:var(--text-muted)">(required)</span></div>
+      <div class="drop-zone" id="z1"
+        onclick="document.getElementById('f1').click()"
+        ondragover="dov(event)" ondrop="ddr(event,1)"
+        ondragenter="den(event,1)" ondragleave="dle(event,1)">
+        <div class="drop-inner">
+          <div class="drop-icon" id="di1">⬡</div>
+          <div class="drop-lbl">Drop JSON here</div>
+          <div class="drop-hint">or click to browse</div>
+          <div class="drop-fname" id="fn1"></div>
+        </div>
+      </div>
+      <input type="file" id="f1" accept=".json" onchange="loadFile(event,1)">
+    </div>
+    <div>
+      <div class="up-col-lbl b">File B &nbsp;<span style="font-size:8px;color:var(--text-muted)">(optional — compare)</span></div>
+      <div class="drop-zone b-zone" id="z2"
+        onclick="document.getElementById('f2').click()"
+        ondragover="dov(event)" ondrop="ddr(event,2)"
+        ondragenter="den(event,2)" ondragleave="dle(event,2)">
+        <div class="drop-inner">
+          <div class="drop-icon" id="di2">⬡</div>
+          <div class="drop-lbl">Drop JSON here</div>
+          <div class="drop-hint">or click to browse</div>
+          <div class="drop-fname" id="fn2"></div>
+        </div>
+      </div>
+      <input type="file" id="f2" accept=".json" onchange="loadFile(event,2)">
+    </div>
+  </div>
+  <button id="btn-go" disabled onclick="launch()">► Initialize Inspector</button>
+</div>
+
+<!-- MAIN SCREEN -->
+<div id="scr-main">
+  <div class="stats-bar" id="stats-bar"></div>
+  <div class="layout">
+    <div class="sidebar">
+      <div class="sb-hdr">Samples <span class="sb-count" id="sb-count">0</span></div>
+      <div class="sb-controls">
+        <input id="q-search" placeholder="Search by name, task, or query…" oninput="applyFilter()">
+        <div class="sb-sort">
+          <button class="sort-btn on" data-s="def" onclick="setSort(this)">Default</button>
+          <button class="sort-btn" data-s="v-asc" onclick="setSort(this)">Viol ↑</button>
+          <button class="sort-btn" data-s="v-desc" onclick="setSort(this)">Viol ↓</button>
+          <button class="sort-btn" data-s="delta" onclick="setSort(this)">Δ</button>
+        </div>
+        <div class="filter-chips" id="filter-chips">
+          <span class="fchip all on" data-f="all" onclick="setFilter(this)">All</span>
+          <span class="fchip violated" data-f="violated" onclick="setFilter(this)">Violated</span>
+          <span class="fchip clean" data-f="clean" onclick="setFilter(this)">Clean</span>
+        </div>
+      </div>
+      <div class="sample-list" id="sample-list"></div>
+    </div>
+
+    <div class="detail-panel">
+      <div class="detail-toolbar" id="detail-toolbar">
+        <span style="color:var(--text-muted);font-size:9px;letter-spacing:2px">CIM // SELECT A SAMPLE</span>
+        <span class="tl-id" id="tl-id"></span>
+      </div>
+      <div class="detail-body" id="detail-body">
+        <div class="empty">
+          <div class="empty-ico">⬡</div>
+          <div class="empty-txt">Select a sample to inspect</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ──────────────────────────────────────────────────────────────────
+let D1=null, D2=null, N1='', N2='';
+let allKeys=[], dispKeys=[], selKey=null, sortMode='def', filterMode='all';
+const MODE_SINGLE='single', MODE_COMPARE='compare';
+let mode=MODE_SINGLE;
+
+// ─── FILE LOADING ────────────────────────────────────────────────────────────
+function dov(e){e.preventDefault();}
+function den(e,s){e.preventDefault();document.getElementById('z'+s).classList.add('over');}
+function dle(e,s){document.getElementById('z'+s).classList.remove('over');}
+function ddr(e,s){e.preventDefault();dle(e,s);const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.json'))parseFile(f,s);}
+function loadFile(e,s){const f=e.target.files[0];if(f)parseFile(f,s);}
+function parseFile(f,s){
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(s===1){D1=d;N1=f.name;}else{D2=d;N2=f.name;}
+      document.getElementById('fn'+s).textContent=f.name;
+      document.getElementById('di'+s).textContent='✓';
+      document.getElementById('z'+s).classList.add('loaded');
+      document.getElementById('btn-go').disabled=!D1;
+    }catch(err){alert('Invalid JSON: '+err.message);}
+  };
+  r.readAsText(f);
+}
+
+// ─── LAUNCH ──────────────────────────────────────────────────────────────────
+function launch(){
+  if(!D1)return;
+  mode=D2?MODE_COMPARE:MODE_SINGLE;
+  document.getElementById('scr-upload').style.display='none';
+  document.getElementById('scr-main').style.display='flex';
+  document.getElementById('btn-back').style.display='block';
+
+  // Header file labels
+  if(mode===MODE_COMPARE){
+    document.getElementById('hdr-files').style.display='flex';
+    document.getElementById('hdr-fa').textContent=N1.replace('.json','');
+    document.getElementById('hdr-fb').textContent=N2.replace('.json','');
+  }
+
+  // Build key union
+  const k1=new Set(Object.keys(D1.entries||{}));
+  const k2=D2?new Set(Object.keys(D2.entries||{})):new Set();
+  allKeys=[...new Set([...k1,...k2])];
+
+  // Extra filter chips for compare mode
+  if(mode===MODE_COMPARE){
+    const fc=document.getElementById('filter-chips');
+    if(!fc.querySelector('[data-f="improved"]')){
+      fc.innerHTML+=`<span class="fchip improved" data-f="improved" onclick="setFilter(this)">Improved</span>`;
+      fc.innerHTML+=`<span class="fchip regressed" data-f="regressed" onclick="setFilter(this)">Regressed</span>`;
+    }
+  }
+
+  renderStatsBar();
+  sortMode='def'; filterMode='all'; applyFilter();
+}
+
+function renderStatsBar(){
+  const k1=new Set(Object.keys(D1.entries||{}));
+  const k2=D2?new Set(Object.keys(D2.entries||{})):new Set();
+  let s='';
+  if(mode===MODE_SINGLE){
+    const [avgV,avgC,viol]=getFileStats(D1);
+    s=`<div class="stat">Samples: <span class="stat-v">${k1.size}</span></div>`+
+      `<div class="stat-sep"></div>`+
+      `<div class="stat">Avg Violation: <span class="stat-v red">${(avgV*100).toFixed(1)}%</span></div>`+
+      `<div class="stat">Avg Completeness: <span class="stat-v green">${(avgC*100).toFixed(1)}%</span></div>`+
+      `<div class="stat-sep"></div>`+
+      `<div class="stat">Violated Gens: <span class="stat-v red">${viol}</span></div>`;
+  } else {
+    const shared=[...k1].filter(k=>k2.has(k)).length;
+    const [v1,c1]=getFileStats(D1);
+    const [v2,c2]=getFileStats(D2);
+    const dv=(v2-v1)*100;
+    const dc=(c2-c1)*100;
+    const dvTag=dv<-0.1?`<span class="delta-tag delta-better">▼${Math.abs(dv).toFixed(1)}%</span>`:dv>0.1?`<span class="delta-tag delta-worse">▲${dv.toFixed(1)}%</span>`:`<span class="delta-tag delta-same">—</span>`;
+    const dcTag=dc>0.1?`<span class="delta-tag delta-better">▲${dc.toFixed(1)}%</span>`:dc<-0.1?`<span class="delta-tag delta-worse">▼${Math.abs(dc).toFixed(1)}%</span>`:`<span class="delta-tag delta-same">—</span>`;
+    s=`<div class="stat">Shared: <span class="stat-v">${shared}</span></div>`+
+      `<div class="stat">A only: <span class="stat-v a">${k1.size-shared}</span></div>`+
+      `<div class="stat">B only: <span class="stat-v b">${k2.size-shared}</span></div>`+
+      `<div class="stat-sep"></div>`+
+      `<div class="stat">Viol A: <span class="stat-v red">${(v1*100).toFixed(1)}%</span></div>`+
+      `<div class="stat">Viol B: <span class="stat-v red">${(v2*100).toFixed(1)}%</span></div>`+
+      `<div class="stat">${dvTag}</div>`+
+      `<div class="stat-sep"></div>`+
+      `<div class="stat">Comp A: <span class="stat-v green">${(c1*100).toFixed(1)}%</span></div>`+
+      `<div class="stat">Comp B: <span class="stat-v green">${(c2*100).toFixed(1)}%</span></div>`+
+      `<div class="stat">${dcTag}</div>`;
+  }
+  document.getElementById('stats-bar').innerHTML=s;
+}
+
+function getFileStats(d){
+  let tv=0,tc=0,n=0,viol=0;
+  Object.values(d.entries||{}).forEach(e=>{
+    Object.values(e.results||{}).forEach(md=>{
+      (md.generations||[]).forEach(g=>{
+        if(g.judge){tv+=g.judge.violation_rate||0;tc+=g.judge.completeness_rate||0;n++;if((g.judge.violation_rate||0)>0)viol++;}
+      });
+    });
+  });
+  return n?[tv/n,tc/n,viol]:[0,0,0];
+}
+
+function showUpload(){
+  document.getElementById('scr-upload').style.display='flex';
+  document.getElementById('scr-main').style.display='none';
+  document.getElementById('btn-back').style.display='none';
+  document.getElementById('hdr-files').style.display='none';
+}
+
+// ─── SORT / FILTER ───────────────────────────────────────────────────────────
+function setSort(btn){
+  document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); sortMode=btn.dataset.s; applyFilter();
+}
+function setFilter(chip){
+  document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('on'));
+  chip.classList.add('on'); filterMode=chip.dataset.f; applyFilter();
+}
+function applyFilter(){
+  const q=(document.getElementById('q-search').value||'').trim().toLowerCase();
+  let keys=[...allKeys];
+  if(q) keys=keys.filter(k=>{
+    const e=(D1&&D1.entries&&D1.entries[k])||(D2&&D2.entries&&D2.entries[k]);
+    if(!e)return false;
+    const name=((e.cim_metadata&&e.cim_metadata.name)||'').toLowerCase();
+    const task=(e.cim_task||'').toLowerCase();
+    const query=(e.query||'').toLowerCase();
+    return name.includes(q)||task.includes(q)||query.includes(q);
+  });
+  if(filterMode==='violated') keys=keys.filter(k=>getAvgViol(D1,k)>0||(D2&&getAvgViol(D2,k)>0));
+  else if(filterMode==='clean') keys=keys.filter(k=>getAvgViol(D1,k)===0&&(!D2||getAvgViol(D2,k)===0));
+  else if(filterMode==='improved') keys=keys.filter(k=>D2&&getViolDelta(k)<-0.001);
+  else if(filterMode==='regressed') keys=keys.filter(k=>D2&&getViolDelta(k)>0.001);
+  if(sortMode==='v-asc') keys.sort((a,b)=>getAvgViol(D1,a)-getAvgViol(D1,b));
+  else if(sortMode==='v-desc') keys.sort((a,b)=>getAvgViol(D1,b)-getAvgViol(D1,a));
+  else if(sortMode==='delta') keys.sort((a,b)=>Math.abs(getViolDelta(b))-Math.abs(getViolDelta(a)));
+  dispKeys=keys;
+  renderList();
+}
+
+function getAvgViol(d,k){
+  if(!d||!d.entries||!d.entries[k])return 0;
+  const e=d.entries[k]; let t=0,c=0;
+  Object.values(e.results||{}).forEach(md=>{(md.generations||[]).forEach(g=>{if(g.judge){t+=g.judge.violation_rate||0;c++;}});});
+  return c?t/c:0;
+}
+function getAvgComp(d,k){
+  if(!d||!d.entries||!d.entries[k])return 0;
+  const e=d.entries[k]; let t=0,c=0;
+  Object.values(e.results||{}).forEach(md=>{(md.generations||[]).forEach(g=>{if(g.judge){t+=g.judge.completeness_rate||0;c++;}});});
+  return c?t/c:0;
+}
+function getViolDelta(k){ return getAvgViol(D2,k)-getAvgViol(D1,k); }
+
+// ─── RENDER SIDEBAR ──────────────────────────────────────────────────────────
+function shortMdl(n){
+  if(!n)return'?';
+  const p=n.split('/'); return p[p.length-1].replace(/-instruct[\s\S]*/i,'').substring(0,20);
+}
+function renderList(){
+  document.getElementById('sb-count').textContent=dispKeys.length;
+  if(!dispKeys.length){
+    document.getElementById('sample-list').innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:9px">No matching samples</div>';
+    return;
+  }
+  document.getElementById('sample-list').innerHTML=dispKeys.map(k=>{
+    const e1=D1&&D1.entries&&D1.entries[k];
+    const e2=D2&&D2.entries&&D2.entries[k];
+    const base=e1||e2;
+    const name=(base.cim_metadata&&base.cim_metadata.name)||'Unknown';
+    const task=base.cim_task||'';
+    const v1=getAvgViol(D1,k), c1=getAvgComp(D1,k);
+    const v2=D2?getAvgViol(D2,k):null, c2=D2?getAvgComp(D2,k):null;
+
+    let rows='';
+    if(mode===MODE_SINGLE){
+      rows=`<div class="si-rows">
+        <div class="si-row">
+          <span class="si-bar" style="flex:1"><span class="si-bar-fill viol" style="width:${Math.round(v1*100)}%"></span></span>
+          <span class="si-pct red">${Math.round(v1*100)}%</span>
+          <span class="si-pct green">${Math.round(c1*100)}%</span>
+        </div>
+      </div>`;
+    } else {
+      const delta=getViolDelta(k);
+      const dTag=delta<-0.001?`<span class="si-delta better">▼${(Math.abs(delta)*100).toFixed(0)}%</span>`:delta>0.001?`<span class="si-delta worse">▲${(delta*100).toFixed(0)}%</span>`:`<span class="si-delta same">—</span>`;
+      rows=`<div class="si-rows">`;
+      if(e1) rows+=`<div class="si-row"><span class="si-file-lbl a">A</span><div class="si-bar"><div class="si-bar-fill va" style="width:${Math.round(v1*100)}%"></div></div><span class="si-pct a">${Math.round(v1*100)}% viol</span></div>`;
+      else rows+=`<div class="si-row"><span class="only-tag only-a">A only missing</span></div>`;
+      if(e2) rows+=`<div class="si-row"><span class="si-file-lbl b">B</span><div class="si-bar"><div class="si-bar-fill vb" style="width:${Math.round(v2*100)}%"></div></div><span class="si-pct b">${Math.round(v2*100)}% viol</span></div>`;
+      else rows+=`<div class="si-row"><span class="only-tag only-b">B only missing</span></div>`;
+      rows+=`<div style="display:flex;align-items:center;gap:6px;margin-top:2px">${dTag}<span style="font-size:7px;color:var(--text-muted)">violation delta</span></div>`;
+      rows+=`</div>`;
+      if(!e1) rows=`<div class="si-rows"><span class="only-tag only-b">B only</span></div>`;
+      if(!e2) rows=`<div class="si-rows"><span class="only-tag only-a">A only</span></div>`;
+    }
+    return `<div class="si${k===selKey?' sel':''}" onclick="select('${k}')">
+      <div class="si-name">${hx(name)}</div>
+      <div class="si-task">${hx(task)}</div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+// ─── SELECT ───────────────────────────────────────────────────────────────────
+function select(k){
+  selKey=k; renderList();
+  renderDetail(k);
+}
+
+// ─── RENDER DETAIL ────────────────────────────────────────────────────────────
+function renderDetail(k){
+  const e1=D1&&D1.entries?D1.entries[k]:null;
+  const e2=D2&&D2.entries?D2.entries[k]:null;
+  const base=e1||e2;
+  const meta=base.cim_metadata||{};
+  const name=meta.name||'Unknown';
+  const task=base.cim_task||meta.cim_task||'';
+  const recipient=base.cim_recipient||meta.cim_recipient||'';
+  const mems=base.memories||[];
+  const attrMap=meta.attribute_memory_map||{};
+  const required=new Set(base.required_attributes||[]);
+  const forbidden=new Set(base.forbidden_attributes||[]);
+  const query=base.query||'';
+
+  // Toolbar
+  document.getElementById('detail-toolbar').innerHTML=
+    `<span class="tl-name">${hx(name)}</span>`+
+    `<span class="tl-arrow">→</span>`+
+    `<span class="tl-task">${hx(task)}</span>`+
+    (recipient?`<span style="color:var(--text-muted);font-size:9px">to</span><span class="tl-recipient">${hx(recipient)}</span>`:'')+
+    `<span class="tl-id">ID: ${k.substring(0,12)}…</span>`;
+
+  let h='';
+
+  // ── 1. SAMPLE INFO ─────────────────────────────────
+  const totalMems=mems.length;
+  const reqCount=required.size, forbCount=forbidden.size;
+  h+=`<div class="sec">
+    <div class="sec-hdr cyan">◈ Sample Information</div>
+    <div class="sec-body">
+      <div class="info-grid">
+        <div class="info-card"><div class="info-card-lbl">Person</div><div class="info-card-val cyan">${hx(name)}</div></div>
+        <div class="info-card"><div class="info-card-lbl">Task</div><div class="info-card-val">${hx(task)}</div></div>
+        <div class="info-card"><div class="info-card-lbl">Recipient</div><div class="info-card-val purple">${hx(recipient||'—')}</div></div>
+        <div class="info-card"><div class="info-card-lbl">Total Memories</div><div class="info-card-val cyan">${totalMems}</div></div>
+        <div class="info-card"><div class="info-card-lbl">Required Attrs</div><div class="info-card-val green">${reqCount}</div></div>
+        <div class="info-card"><div class="info-card-lbl">Forbidden Attrs</div><div class="info-card-val red">${forbCount}</div></div>
+      </div>
+    </div>
+  </div>`;
+
+  // ── 2. QUERY ────────────────────────────────────────
+  h+=`<div class="sec">
+    <div class="sec-hdr cyan">▶ Full Query
+      <div class="sec-hdr-right">
+        <span class="sec-count">${query.length} chars</span>
+        <button class="toggle-btn" onclick="toggleEl('query-body')">Show/Hide</button>
+      </div>
+    </div>
+    <div class="sec-body" id="query-body">
+      <div class="query-box">${hx(query)}</div>
+    </div>
+  </div>`;
+
+  // ── 3. MEMORIES INJECTED ────────────────────────────
+  h+=`<div class="sec purple-theme">
+    <div class="sec-hdr purple">◆ Memories Injected
+      <div class="sec-hdr-right">
+        <span class="sec-count">${totalMems} entries</span>
+        <button class="toggle-btn" onclick="toggleEl('mems-body')">Show/Hide</button>
+      </div>
+    </div>
+    <div class="sec-body" id="mems-body">
+      <div class="mem-list">${mems.map((m,i)=>`<div class="mem-item"><span class="mem-idx">${i+1}</span><span class="mem-dot">◆</span><span>${hx(m)}</span></div>`).join('')}</div>
+    </div>
+  </div>`;
+
+  // ── 4. ATTRIBUTE MAP ────────────────────────────────
+  const reqAttrs=[], forbAttrs=[], neutralAttrs=[];
+  Object.entries(attrMap).forEach(([id,text])=>{
+    if(required.has(id)) reqAttrs.push({id,text});
+    else if(forbidden.has(id)) forbAttrs.push({id,text});
+    else neutralAttrs.push({id,text});
+  });
+  required.forEach(id=>{if(!attrMap[id])reqAttrs.push({id,text:'(no memory text)'});});
+  forbidden.forEach(id=>{if(!attrMap[id])forbAttrs.push({id,text:'(no memory text)'});});
+
+  h+=`<div class="sec">
+    <div class="sec-hdr orange">⊛ Attribute Memory Map
+      <div class="sec-hdr-right">
+        <span class="sec-count">${Object.keys(attrMap).length} attrs</span>
+        <button class="toggle-btn" onclick="toggleEl('attrmap-body')">Show/Hide</button>
+      </div>
+    </div>
+    <div class="sec-body" id="attrmap-body">
+      <div class="attr-groups">`;
+  if(reqAttrs.length) h+=attrGroup('Required',reqAttrs,'required','badge-required',`${reqAttrs.length} attrs — must appear in response`);
+  if(forbAttrs.length) h+=attrGroup('Forbidden',forbAttrs,'forbidden','badge-forbidden',`${forbAttrs.length} attrs — must NOT appear`);
+  if(neutralAttrs.length) h+=attrGroup('Neutral',neutralAttrs,'neutral','badge-neutral',`${neutralAttrs.length} attrs — no constraint`,true);
+  h+=`</div></div></div>`;
+
+  // ── 5. RESULTS ──────────────────────────────────────
+  h+=`<div class="sec green-theme">
+    <div class="sec-hdr green">⊞ Model Results`;
+  if(mode===MODE_COMPARE){
+    h+=`<div class="sec-hdr-right">
+      <span style="font-size:8px;color:var(--ca)">▌ A: ${hx(N1.replace('.json',''))}</span>
+      <span style="font-size:8px;color:var(--text-muted)">vs</span>
+      <span style="font-size:8px;color:var(--cb)">▌ B: ${hx(N2.replace('.json',''))}</span>
+    </div>`;
+  }
+  h+=`</div><div class="sec-body">`;
+
+  if(mode===MODE_SINGLE){
+    // Single file: just show results
+    const models=Object.keys((e1||{}).results||{});
+    for(const model of models){
+      const md=(e1||{}).results[model];
+      h+=`<div class="model-block-hdr"><span class="model-dot"></span>${hx(model)}</div>`;
+      (md.generations||[]).forEach(gen=>{
+        h+=renderGen(gen,required,forbidden,attrMap,'a',gen.generation_index);
+      });
+    }
+  } else {
+    // Compare mode: side-by-side per model
+    const models=[...new Set([
+      ...Object.keys((e1&&e1.results)||{}),
+      ...Object.keys((e2&&e2.results)||{})
+    ])];
+
+    // Header row
+    h+=`<div class="cmp-header">
+      <div class="cmp-file-hdr a">▌ A: ${hx(N1.replace('.json',''))}</div>
+      <div class="cmp-file-hdr b">▌ B: ${hx(N2.replace('.json',''))}</div>
+    </div>`;
+
+    for(const model of models){
+      h+=`<div class="model-block-hdr"><span class="model-dot"></span>${hx(model)}</div>`;
+      const md1=(e1&&e1.results&&e1.results[model]);
+      const md2=(e2&&e2.results&&e2.results[model]);
+      const maxGens=Math.max((md1&&md1.generations||[]).length,(md2&&md2.generations||[]).length,1);
+
+      for(let gi=0;gi<maxGens;gi++){
+        const gen1=md1&&md1.generations&&md1.generations[gi];
+        const gen2=md2&&md2.generations&&md2.generations[gi];
+        // Delta row
+        if(gen1&&gen2&&gen1.judge&&gen2.judge){
+          const dv=((gen2.judge.violation_rate||0)-(gen1.judge.violation_rate||0))*100;
+          const dc=((gen2.judge.completeness_rate||0)-(gen1.judge.completeness_rate||0))*100;
+          const cls=dv<-0.1?'improved':dv>0.1?'worsened':'unchanged';
+          const icon=dv<-0.1?'▼':dv>0.1?'▲':'—';
+          const vColor=dv<-0.1?'var(--green)':dv>0.1?'var(--red)':'var(--text-muted)';
+          const cColor=dc>0.1?'var(--green)':dc<-0.1?'var(--red)':'var(--text-muted)';
+          h+=`<div class="delta-row ${cls}">
+            <span class="delta-icon">${icon}</span>
+            <span class="delta-text">Violation: <span class="delta-val" style="color:${vColor}">${dv>=0?'+':''}${dv.toFixed(1)}%</span></span>
+            <span style="color:var(--text-muted);margin:0 4px">·</span>
+            <span class="delta-text">Completeness: <span class="delta-val" style="color:${cColor}">${dc>=0?'+':''}${dc.toFixed(1)}%</span></span>
+            <span style="margin-left:auto;font-size:7px;color:var(--text-muted)">Gen ${gi}</span>
+          </div>`;
+        }
+        h+=`<div class="cmp-grid">`;
+        h+=`<div>${gen1?renderGen(gen1,required,forbidden,attrMap,'a',gi):notInFile()}</div>`;
+        h+=`<div>${gen2?renderGen(gen2,required,forbidden,attrMap,'b',gi):notInFile()}</div>`;
+        h+=`</div>`;
+      }
+    }
+
+    if(!e1){h+=`<div style="grid-column:1/3"><div class="not-in-file"><div class="not-in-file-ico">⊘</div>Not in File A</div></div>`;}
+    if(!e2){h+=`<div style="grid-column:1/3"><div class="not-in-file"><div class="not-in-file-ico">⊘</div>Not in File B</div></div>`;}
+  }
+
+  h+=`</div></div>`;
+  document.getElementById('detail-body').innerHTML=h;
+}
+
+function notInFile(){
+  return`<div class="not-in-file"><div class="not-in-file-ico">⊘</div>Not in this file</div>`;
+}
+
+function attrGroup(label,attrs,type,badgeCls,desc,collapsed){
+  const bodyId=`ag-${type}-${Math.random().toString(36).slice(2,7)}`;
+  return `<div>
+    <div class="attr-group-hdr">
+      <span class="attr-group-badge ${badgeCls}">${label}</span>
+      <span class="attr-count">${desc}</span>
+      <button class="toggle-btn" style="margin-left:auto" onclick="toggleEl('${bodyId}')">Show/Hide</button>
+    </div>
+    <div id="${bodyId}" ${collapsed?'style="display:none"':''}>
+      <div class="attr-grid">${attrs.map(a=>renderAttrItem(a,type)).join('')}</div>
+    </div>
+  </div>`;
+}
+
+function renderAttrItem(a,type){
+  const icon=type==='required'?'◉':type==='forbidden'?'⊗':'◦';
+  const iconColor=type==='required'?'var(--green)':type==='forbidden'?'var(--red)':'var(--text-muted)';
+  return`<div class="attr-item ${type}">
+    <span class="attr-icon" style="color:${iconColor}">${icon}</span>
+    <div style="flex:1">
+      <div class="attr-id">${fmtAttrId(a.id)}</div>
+      <div class="attr-text">${hx(a.text)}</div>
+    </div>
+  </div>`;
+}
+
+function fmtAttrId(id){
+  return (id||'').split('_').map((p,i)=>{
+    const cls=i===0?'attr-seg cat0':i===1?'attr-seg cat1':'attr-seg ev';
+    return`<span class="${cls}">${hx(p)}</span>`;
+  }).join('');
+}
+
+function renderGen(gen,required,forbidden,attrMap,side,idx){
+  if(gen.error){
+    return`<div class="gen-block${side==='b'?' b-side':''}">
+      <div class="gen-hdr"><span class="gen-label">Gen ${idx}</span></div>
+      <div class="gen-body" style="color:var(--red);font-size:10px;padding:10px">⚠ ${hx(gen.error)}</div>
+    </div>`;
+  }
+  const judge=gen.judge||{};
+  const vp=Math.round((judge.violation_rate||0)*100);
+  const cp=Math.round((judge.completeness_rate||0)*100);
+  const perAttr=judge.per_attribute||[];
+  const revSet=new Set(judge.revealed_attributes||[]);
+  const usedSet=new Set(judge.used_attributes||[]);
+
+  const uid=`g${side}${idx}${Math.random().toString(36).slice(2,6)}`;
+
+  let h=`<div class="gen-block${side==='b'?' b-side':''}">
+    <div class="gen-hdr">
+      <span class="gen-label">Gen ${idx}</span>
+      <div class="gen-scores">
+        <div class="score-meter">
+          <span class="score-meter-lbl">Viol</span>
+          <div class="score-track"><div class="score-fill viol" style="width:${vp}%"></div></div>
+          <span class="score-pct red">${vp}%</span>
+        </div>
+        <div class="score-meter">
+          <span class="score-meter-lbl">Comp</span>
+          <div class="score-track"><div class="score-fill comp" style="width:${cp}%"></div></div>
+          <span class="score-pct green">${cp}%</span>
+        </div>
+      </div>
+    </div>
+    <div class="gen-body">
+      <div class="resp-lbl">Response</div>
+      <div class="resp-box">${md2html(gen.memory_response||'(empty)')}</div>`;
+
+  if(perAttr.length){
+    const forbViol=perAttr.filter(a=>forbidden.has(a.id)&&(a.revealed||a.used));
+    const forbOk=perAttr.filter(a=>forbidden.has(a.id)&&!a.revealed&&!a.used);
+    const reqOk=perAttr.filter(a=>required.has(a.id)&&(a.used||a.revealed));
+    const reqMiss=perAttr.filter(a=>required.has(a.id)&&!a.used&&!a.revealed);
+    const neutFlag=perAttr.filter(a=>!required.has(a.id)&&!forbidden.has(a.id)&&(a.revealed||a.used));
+    const neutClean=perAttr.filter(a=>!required.has(a.id)&&!forbidden.has(a.id)&&!a.revealed&&!a.used);
+
+    h+=`<div class="attr-judge-wrap">
+      <div class="attr-judge-lbl">⊛ Attribute Judgement</div>
+      <div class="summary-badges">`;
+    if(forbViol.length) h+=`<span class="sbadge leaked">⊗ ${forbViol.length} forbidden leaked</span>`;
+    if(forbOk.length)   h+=`<span class="sbadge protected">✓ ${forbOk.length} forbidden protected</span>`;
+    if(reqOk.length)    h+=`<span class="sbadge included">◉ ${reqOk.length} required included</span>`;
+    if(reqMiss.length)  h+=`<span class="sbadge missing">◌ ${reqMiss.length} required missing</span>`;
+    h+=`</div><div class="attr-judge-list">`;
+
+    const notable=[
+      ...forbViol.map(a=>({...a,_t:'fl'})),
+      ...reqMiss.map(a=>({...a,_t:'rm'})),
+      ...reqOk.map(a=>({...a,_t:'ri'})),
+      ...forbOk.map(a=>({...a,_t:'fo'})),
+      ...neutFlag.map(a=>({...a,_t:'nf'})),
+    ];
+    for(const a of notable) h+=renderAjRow(a,required,forbidden,attrMap);
+
+    if(neutClean.length){
+      h+=`<div id="${uid}-nc" style="display:none">`;
+      for(const a of neutClean) h+=renderAjRow({...a,_t:'nc'},required,forbidden,attrMap);
+      h+=`</div>
+      <div style="text-align:center;margin-top:5px">
+        <button class="toggle-btn" onclick="toggleEl('${uid}-nc')">± ${neutClean.length} neutral clean</button>
+      </div>`;
+    }
+    h+=`</div></div>`;
+  }
+  h+=`</div></div>`;
+  return h;
+}
+
+function renderAjRow(a,required,forbidden,attrMap){
+  const isReq=required.has(a.id), isForb=forbidden.has(a.id);
+  let rowCls='clean', stTxt='CLEAN', stCls='ok';
+  if(a._t==='fl'){rowCls='revealed';stTxt='LEAKED';stCls='leaked';}
+  else if(a._t==='rm'){rowCls='required-miss';stTxt='MISSING';stCls='missing';}
+  else if(a._t==='ri'){stTxt='INCLUDED';stCls='included';}
+  else if(a._t==='fo'){stTxt='PROTECTED';stCls='ok';}
+  else if(a._t==='nf'){rowCls='used-only';stTxt=a.revealed?'REVEALED':'USED';stCls='used';}
+  const memText=attrMap[a.id]||'';
+  const badge=isReq?'<span class="aj-badge req">Req</span>':isForb?'<span class="aj-badge forb">Forb</span>':'';
+  return`<div class="aj-row ${rowCls}">
+    <span class="aj-status ${stCls}">${stTxt}</span>
+    <div class="aj-main">
+      <div class="aj-id">${fmtAttrId(a.id).replace(/attr-seg/g,'aj-seg')}${badge}</div>
+      ${memText?`<div style="font-size:8px;color:var(--text-muted);margin-top:2px">${hx(memText)}</div>`:''}
+      ${a.evidence?`<div class="aj-evidence">"${hx(a.evidence)}"</div>`:''}
+    </div>
+  </div>`;
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function hx(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function md2html(t){if(!t)return'';let h=hx(t);h=h.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');h=h.replace(/^#{1,3} (.+)$/gm,'<strong style="color:var(--cyan)">$1</strong>');h=h.replace(/\n/g,'<br>');return h;}
+function toggleEl(id){const el=document.getElementById(id);if(el)el.style.display=el.style.display==='none'?'':'none';}
+</script>
+</body>
+</html>
