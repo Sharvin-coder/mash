@@ -106,7 +106,7 @@ class BenchmarkConfig(BaseModel):
     judge_provider: str | None = None
     input: Path
     output: Path
-    method: str | None = None  # "partitioned" enables per-model input files
+    method: str | None = None  # "partitioned" or "partitioned_labeled" enables per-model input files
     store_raw_api_responses: bool = False
     generations: PositiveInt | None = None
     concurrency: PositiveInt = 1
@@ -153,10 +153,10 @@ def load_benchmark_config_data(
     config = BenchmarkConfig(**data)
 
     # Validate method field
-    if config.method is not None and config.method != "partitioned":
+    if config.method is not None and config.method not in ("partitioned", "partitioned_labeled"):
         raise ValueError(
             f"Invalid method '{config.method}' in config ({config_path}). "
-            f"Valid values: 'partitioned' (or omit for default behaviour)."
+            f"Valid values: 'partitioned', 'partitioned_labeled' (or omit for default behaviour)."
         )
 
     # Validate unique model names (results are keyed by name in checkpoint)

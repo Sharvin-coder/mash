@@ -235,6 +235,48 @@ def _load_partitioned_entries(config: BenchmarkConfig) -> list[InputEntry]:
     return entries
 
 
+def _load_partitioned_labeled_entries(config: BenchmarkConfig) -> list[InputEntry]:
+    """Load entries per model with one labeled line per memory, grouped by category.
+
+    Like partitioned mode, but memories are pre-formatted as a flat list of
+    ``"Category: memory"`` strings (one per memory, grouped by category) instead
+    of a dict.  Because the list is passed through _format_generation_memories
+    unchanged (no shuffle), the model sees memories in category order:
+
+        Category1: memory1
+        Category1: memory2
+        Category2: memory1
+        ...
+    """
+    merged: dict[str, InputEntry] = {}  # hash_id -> entry
+
+    for model in config.models:
+        model_input = model.input or config.input
+        model_entries = load_and_validate_entries(model_input)
+        for entry in model_entries:
+            hash_id = entry["hash_id"]
+            cat_mems = entry.get("categorized_memories")
+            if cat_mems is not None:
+                model_memories: list[str] = [
+                    f"{category}: {memory}"
+                    for category, items in cat_mems.items()
+                    for memory in items
+                ]
+            else:
+                model_memories = list(entry["memories"])
+            if hash_id in merged:
+                merged[hash_id]["model_affinity"].add(model.name)
+                merged[hash_id].setdefault("model_memories", {})[model.name] = model_memories
+            else:
+                entry["model_affinity"] = {model.name}
+                entry["model_memories"] = {model.name: model_memories}
+                merged[hash_id] = entry
+
+    entries = list(merged.values())
+    print(f"Partitioned-labeled mode: {len(entries)} unique entries across {len(config.models)} model(s)")
+    return entries
+
+
 def _load_from_file(
     file_path: Path,
     limit: int | None = None,
@@ -275,6 +317,8 @@ def _load_from_file(
             )
         elif config.method == "partitioned":
             entries = _load_partitioned_entries(config)
+        elif config.method == "partitioned_labeled":
+            entries = _load_partitioned_labeled_entries(config)
         elif effective_dataset == "cim":
             entries = _load_cim_entries(config)
         else:

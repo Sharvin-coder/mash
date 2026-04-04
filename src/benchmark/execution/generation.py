@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import random
 import traceback
 from dataclasses import dataclass
 from typing import Any, Sequence
@@ -20,6 +22,7 @@ from benchmark.checkpoint import (
     save_checkpoint,
 )
 from benchmark.config import (
+    BENCHMARK_SEED,
     BenchmarkConfig,
     ModelEntry,
 )
@@ -44,7 +47,7 @@ from benchmark.work_planner import InputEntry, WorkItem
 BATCH_REQUEST_DELIMITER = "__"
 PHASE_GENERATION = "generation"
 ERROR_EMPTY_RESPONSE = "Empty or whitespace-only response"
-PRINT_PROMPTS = False
+PRINT_PROMPTS = True
 
 __all__ = [
     "BATCH_REQUEST_DELIMITER",
@@ -70,7 +73,7 @@ class GenerationTask:
         return self.entry["hash_id"]
 
     @property
-    def memories(self) -> list[str]:
+    def memories(self) -> list[str] | dict[str, list[str]]:
         """Return the memories to use for this model's generation.
 
         In partitioned mode each model has its own categorised memories stored
@@ -103,6 +106,38 @@ def build_generation_tasks(pending_work: Sequence[WorkItem]) -> list[GenerationT
             )
         )
     return tasks
+
+
+def _format_generation_memories(
+    memories: list[str] | dict[str, list[str]],
+    *,
+    hash_id: str,
+    model_name: str,
+    gen_idx: int,
+) -> list[str]:
+    """Flatten memories into prompt-ready lines.
+
+    Partitioned inputs may preserve category buckets as
+    ``{"health": ["m1", "m2"]}``. Expand those into:
+
+    - ``health: m1``
+    - ``health: m2``
+
+    For partitioned inputs, the flattened lines are shuffled in a
+    deterministic order so categories are interleaved while reruns remain
+    reproducible.
+    """
+    if isinstance(memories, dict):
+        formatted: list[str] = []
+        for category, items in memories.items():
+            for memory in items:
+                formatted.append(f"{category}: {memory}")
+        seed_material = f"{BENCHMARK_SEED}|{hash_id}|{model_name}|{gen_idx}"
+        seed = int(hashlib.sha256(seed_material.encode("utf-8")).hexdigest(), 16)
+        rng = random.Random(seed)
+        rng.shuffle(formatted)
+        return formatted
+    return list(memories)
 
 
 class SequentialGenerationExecutor:
@@ -241,6 +276,8 @@ async def _process_generation_task(
             generate_fn,
             task.entry["query"],
             task.memories,
+            task.hash_id,
+            task.gen_idx,
             prompt_template,
             cim_task=task.entry.get("cim_task"),
             cim_recipient=task.entry.get("cim_recipient"),
@@ -287,13 +324,21 @@ async def _generate_model_response(
     model: ModelEntry,
     generate_response_fn: GenerateFn,
     query: str,
-    memories: list[str],
+    memories: list[str] | dict[str, list[str]],
+    task_hash_id: str,
+    gen_idx: int,
     prompt_template: str | None = None,
     cim_task: str | None = None,
     cim_recipient: str | None = None,
 ) -> tuple[str | None, dict[str, Any], str | None]:
     """Call generation function and handle errors."""
     try:
+        formatted_memories = _format_generation_memories(
+            memories,
+            hash_id=task_hash_id,
+            model_name=model.name,
+            gen_idx=gen_idx,
+        )
         # CIM defense templates use {task}/{recipient} and should replace the
         # user message (matching the paper's single-message architecture).
         # In that case the system prompt is left empty.
@@ -305,14 +350,14 @@ async def _generate_model_response(
         ):
             generation_prompt = ""
             query = build_cim_user_message(
-                memories, cim_task, cim_recipient, prompt_template
+                formatted_memories, cim_task, cim_recipient, prompt_template
             )
         elif prompt_template:
             generation_prompt = build_generation_prompt(
-                memories, model.name, prompt_template
+                formatted_memories, model.name, prompt_template
             )
         else:
-            generation_prompt = build_generation_prompt(memories, model.name)
+            generation_prompt = build_generation_prompt(formatted_memories, model.name)
 
         if PRINT_PROMPTS:
             print(f"\n{'='*80}")
@@ -530,6 +575,12 @@ def _prepare_generation_batch_items(
 ) -> list[BatchWorkItem]:
     batch_items: list[BatchWorkItem] = []
     for task in tasks:
+        formatted_memories = _format_generation_memories(
+            task.memories,
+            hash_id=task.hash_id,
+            model_name=task.model.name,
+            gen_idx=task.gen_idx,
+        )
         cim_task = task.entry.get("cim_task")
         cim_recipient = task.entry.get("cim_recipient")
 
@@ -541,16 +592,16 @@ def _prepare_generation_batch_items(
         ):
             generation_prompt = ""
             user_message = build_cim_user_message(
-                task.memories, cim_task, cim_recipient, prompt_template
+                formatted_memories, cim_task, cim_recipient, prompt_template
             )
         elif prompt_template:
             generation_prompt = build_generation_prompt(
-                task.memories, task.model.name, prompt_template
+                formatted_memories, task.model.name, prompt_template
             )
             user_message = task.entry["query"]
         else:
             generation_prompt = build_generation_prompt(
-                task.memories, task.model.name
+                formatted_memories, task.model.name
             )
             user_message = task.entry["query"]
 

@@ -86,15 +86,15 @@ def load_and_validate_entries(input_file: Path) -> list[InputEntry]:
         if "memories" not in raw_entry or "query" not in raw_entry:
             raise FatalBenchmarkError("Entry must have 'memories' and 'query' fields")
 
-        memories = raw_entry["memories"]
+        raw_memories = raw_entry["memories"]
         query = raw_entry["query"]
 
-        if not isinstance(memories, (list, dict)):
+        if not isinstance(raw_memories, (list, dict)):
             raise FatalBenchmarkError("'memories' must be a list or dict")
         if not isinstance(query, str) or not query.strip():
             raise FatalBenchmarkError("'query' must be a non-empty string")
 
-        memories = _normalize_memories(memories)
+        memories = _normalize_memories(raw_memories)
         # Use the hash_id already stored in the file (e.g. written by partition_memories.py
         # from the original flat memories) so all models share one stable hash per sample.
         # Fall back to computing from the normalized memories for plain input files.
@@ -122,6 +122,10 @@ def load_and_validate_entries(input_file: Path) -> list[InputEntry]:
             "original_index": i,
             "failure_type": failure_type,
         }
+        if isinstance(raw_memories, dict):
+            entry_data["categorized_memories"] = {
+                category: list(items) for category, items in raw_memories.items()
+            }
         # Preserve CIM-specific fields so judges can evaluate them after JSONL load
         if failure_type == "cim":
             for key in ("required_attributes", "forbidden_attributes",

@@ -47,10 +47,14 @@ TEMPERATURE    = 0
 # ── RUN CONFIG ────────────────────────────────────────────────────────────────
 CONCURRENCY     = 7    # max simultaneous API requests
 MAX_RETRIES     = 5    # retry attempts per sample on parse / API failure
-_PROJECT_ROOT   = Path(__file__).parent.parent.parent.parent  # repo root
+_PROJECT_ROOT   = Path(__file__).resolve().parent.parent  # repo root
 CIM_DATASET_ID  = "facebook/CIMemories"
-CIM_LABELS_FILE = _PROJECT_ROOT / "outputs/CIM/cim_labels.json"
-OUTPUT_FILE     = _PROJECT_ROOT / "benchmark_samples/cim/partitioned/llama3p3_70b/cim.jsonl"
+CIM_LABELS_FILES = (
+    _PROJECT_ROOT / "outputs" / "CIM" / "cim_labels.json",
+    _PROJECT_ROOT / "outputs" / "cim_labels.json",
+    _PROJECT_ROOT / "cim_labels.json",
+)
+OUTPUT_FILE     = _PROJECT_ROOT / "cim.jsonl"
 # ──────────────────────────────────────────────────────────────────────────────
 
 # ── PROMPT ────────────────────────────────────────────────────────────────────
@@ -105,7 +109,7 @@ import sys  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))  # add src/ so 'benchmark' is importable
 
 from benchmark.utils import extract_json_from_response, get_vertex_ai_client  # noqa: E402
-from benchmark.datasets.cim import CIMDataset  # noqa: E402
+from benchmark.dataset_loaders.cim import CIMDataset  # noqa: E402
 
 
 def _parse_args() -> argparse.Namespace:
@@ -120,6 +124,14 @@ def _parse_args() -> argparse.Namespace:
              "Omit to process all personas.",
     )
     return parser.parse_args()
+
+
+def _resolve_labels_file() -> Path | None:
+    """Return the first existing default CIM labels file."""
+    for path in CIM_LABELS_FILES:
+        if path.exists():
+            return path
+    return None
 
 
 def _load_checkpoint() -> tuple[set[str], dict[str, dict[str, list[str]]]]:
@@ -235,11 +247,12 @@ def _build_sample_row(sample, partition: dict[str, list[str]]) -> dict:
 async def main() -> None:
     args = _parse_args()
 
-    labels_file = CIM_LABELS_FILE if CIM_LABELS_FILE.exists() else None
+    labels_file = _resolve_labels_file()
     if labels_file is None:
+        searched = ", ".join(str(path) for path in CIM_LABELS_FILES)
         print(
-            "[WARN] CIM labels file not found at "
-            f"{CIM_LABELS_FILE}. Falling back to HuggingFace label column."
+            "[WARN] CIM labels file not found. Looked in: "
+            f"{searched}. Falling back to HuggingFace label column."
         )
 
     print(f"Loading CIM dataset from {CIM_DATASET_ID} ...")
