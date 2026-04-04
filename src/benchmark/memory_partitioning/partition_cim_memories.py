@@ -1,26 +1,35 @@
 #!/usr/bin/env python3
-"""Partition CIM memories into 11 categories.
+"""Partition CIM memories into 11 categories — once per persona.
 
 Reads samples from the facebook/CIMemories HuggingFace dataset (full_profile
-mode), partitions each sample's flat memory list into 11 categories using an
-LLM, and writes a JSONL file compatible with the benchmark runner's partitioned
-mode.
+mode), partitions each *persona's* flat memory list into 11 categories using an
+LLM (one LLM call per persona, not per sample), and writes a JSONL file
+compatible with the benchmark runner's partitioned mode.
 
 Each output row preserves all CIM-specific fields (required_attributes,
 forbidden_attributes, cim_metadata) so the judge can evaluate properly.
 
+Usage:
+  # Partition specific personas only
+  uv run python partition_cim_memories.py --personas "Jeffery Day" "Shawn Franklin"
+
+  # Partition all personas
+  uv run python partition_cim_memories.py
+
 ─── HOW TO EDIT ───────────────────────────────────────────────────────────────
-  • Change the model / location / temperature  →  MODEL block below
-  • Change input/output paths                  →  RUN CONFIG below
-  • Change concurrency or retry behaviour      →  RUN CONFIG below
-  • Change what the LLM is told to do          →  SYSTEM_PROMPT below
+  * Change the model / location / temperature  ->  MODEL block below
+  * Change input/output paths                  ->  RUN CONFIG below
+  * Change concurrency or retry behaviour      ->  RUN CONFIG below
+  * Change what the LLM is told to do          ->  SYSTEM_PROMPT below
 ───────────────────────────────────────────────────────────────────────────────
 """
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
+from collections import defaultdict
 from pathlib import Path
 import os
 
@@ -99,19 +108,47 @@ from benchmark.utils import extract_json_from_response, get_vertex_ai_client  # 
 from benchmark.datasets.cim import CIMDataset  # noqa: E402
 
 
-def _load_checkpoint() -> set[str]:
-    """Return the set of hash_ids already written to the output file."""
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Partition CIM memories into 11 categories (once per persona).",
+    )
+    parser.add_argument(
+        "--personas",
+        nargs="+",
+        default=None,
+        help='Persona names to process (e.g. --personas "Jeffery Day" "Shawn Franklin"). '
+             "Omit to process all personas.",
+    )
+    return parser.parse_args()
+
+
+def _load_checkpoint() -> tuple[set[str], dict[str, dict[str, list[str]]]]:
+    """Return (done_hash_ids, persona_partitions) from the existing output file.
+
+    In addition to tracking which sample hash_ids are already written, this
+    recovers the partition for each persona so that a resumed run does not need
+    to re-call the LLM for personas that were already (partially) written.
+    """
     done: set[str] = set()
+    persona_partitions: dict[str, dict[str, list[str]]] = {}
+
     if OUTPUT_FILE.exists():
-        with open(OUTPUT_FILE) as f:
+        with open(OUTPUT_FILE, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                if line:
-                    try:
-                        done.add(json.loads(line)["hash_id"])
-                    except (json.JSONDecodeError, KeyError):
-                        pass
-    return done
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                    done.add(row["hash_id"])
+                    # Recover the partition for this persona (first row wins)
+                    name = row.get("cim_metadata", {}).get("name")
+                    if name and name not in persona_partitions:
+                        persona_partitions[name] = row["memories"]
+                except (json.JSONDecodeError, KeyError):
+                    pass
+
+    return done, persona_partitions
 
 
 def _validate_partition(
@@ -176,22 +213,8 @@ async def _classify(
     return fallback
 
 
-async def _process_sample(
-    sample,
-    client,
-    semaphore: asyncio.Semaphore,
-    out_file,
-    lock: asyncio.Lock,
-    counter: list[int],
-    total: int,
-) -> None:
-    memories: list[str] = sample.memories
-
-    if memories:
-        partition = await _classify(client, memories, semaphore)
-    else:
-        partition = {cat: [] for cat in CATEGORIES}
-
+def _build_sample_row(sample, partition: dict[str, list[str]]) -> dict:
+    """Build the output JSONL row for a single sample."""
     result: dict = {
         "query": sample.prompt,
         "memories": partition,
@@ -201,20 +224,17 @@ async def _process_sample(
         "forbidden_attributes": sample.forbidden_attributes,
         "cim_metadata": sample.metadata,
     }
-    # Also hoist top-level convenience fields that the benchmark runner expects
+    # Hoist top-level convenience fields that the benchmark runner expects
     if "cim_task" in sample.metadata:
         result["cim_task"] = sample.metadata["cim_task"]
     if "cim_recipient" in sample.metadata:
         result["cim_recipient"] = sample.metadata["cim_recipient"]
-
-    async with lock:
-        out_file.write(json.dumps(result, ensure_ascii=False) + "\n")
-        out_file.flush()
-        counter[0] += 1
-        print(f"[{counter[0]}/{total}] {sample.prompt[:70]}…")
+    return result
 
 
 async def main() -> None:
+    args = _parse_args()
+
     labels_file = CIM_LABELS_FILE if CIM_LABELS_FILE.exists() else None
     if labels_file is None:
         print(
@@ -222,42 +242,93 @@ async def main() -> None:
             f"{CIM_LABELS_FILE}. Falling back to HuggingFace label column."
         )
 
-    print(f"Loading CIM dataset from {CIM_DATASET_ID} …")
+    print(f"Loading CIM dataset from {CIM_DATASET_ID} ...")
     cim_dataset = CIMDataset(
         dataset_id=CIM_DATASET_ID,
         memory_mode="full_profile",
         labels_file=labels_file,
     )
     samples = list(cim_dataset)
-    total = len(samples)
-    print(f"Loaded {total} CIM samples")
+    print(f"Loaded {len(samples)} CIM samples")
 
-    # Resume support
-    done_ids = _load_checkpoint()
-    pending = [s for s in samples if s.sample_id not in done_ids]
-    print(f"Already done: {len(done_ids)} | Remaining: {len(pending)}")
+    # ── Group samples by persona ─────────────────────────────────────────────
+    persona_samples: dict[str, list] = defaultdict(list)
+    for s in samples:
+        persona_samples[s.metadata["name"]].append(s)
 
-    if not pending:
-        print("All samples already processed.")
+    # Apply persona filter from CLI
+    if args.personas is not None:
+        requested = set(args.personas)
+        available = set(persona_samples.keys())
+        unknown = requested - available
+        if unknown:
+            print(f"[WARN] Unknown persona(s): {unknown}")
+            print(f"       Available: {sorted(available)}")
+        persona_samples = {
+            name: samps for name, samps in persona_samples.items()
+            if name in requested
+        }
+
+    if not persona_samples:
+        print("No personas to process.")
         return
 
+    total_samples = sum(len(samps) for samps in persona_samples.values())
+    print(
+        f"Processing {len(persona_samples)} persona(s), "
+        f"{total_samples} samples total"
+    )
+
+    # ── Resume support ───────────────────────────────────────────────────────
+    done_ids, persona_partitions = _load_checkpoint()
+    print(f"Checkpoint: {len(done_ids)} samples written, "
+          f"{len(persona_partitions)} persona partition(s) recovered")
+
+    # ── Phase 1: Classify once per persona ───────────────────────────────────
+    personas_to_classify = [
+        name for name in persona_samples
+        if name not in persona_partitions
+    ]
+
+    if personas_to_classify:
+        print(f"\nPhase 1: Classifying {len(personas_to_classify)} persona(s) ...")
+        semaphore = asyncio.Semaphore(CONCURRENCY)
+
+        async with get_vertex_ai_client(MODEL_LOCATION) as client:
+            classify_tasks = []
+            for name in personas_to_classify:
+                # All samples for the same persona share identical memories
+                # in full_profile mode, so we use the first sample's list.
+                memories = persona_samples[name][0].memories
+                classify_tasks.append(_classify(client, memories, semaphore))
+
+            results = await asyncio.gather(*classify_tasks)
+
+            for name, partition in zip(personas_to_classify, results):
+                persona_partitions[name] = partition
+                mem_count = sum(len(v) for v in partition.values())
+                print(f"  {name}: {mem_count} memories classified")
+    else:
+        print("\nPhase 1: All persona partitions recovered from checkpoint.")
+
+    # ── Phase 2: Write sample rows ───────────────────────────────────────────
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    counter = len(done_ids)
 
-    semaphore = asyncio.Semaphore(CONCURRENCY)
-    lock = asyncio.Lock()
-    counter = [len(done_ids)]
+    print(f"\nPhase 2: Writing sample rows ...")
+    with open(OUTPUT_FILE, "a", encoding="utf-8") as out_file:
+        for name, samps in persona_samples.items():
+            partition = persona_partitions[name]
+            for sample in samps:
+                if sample.sample_id in done_ids:
+                    continue
+                row = _build_sample_row(sample, partition)
+                out_file.write(json.dumps(row, ensure_ascii=False) + "\n")
+                out_file.flush()
+                counter += 1
+                print(f"[{counter}/{total_samples}] {name}: {sample.prompt[:60]}...")
 
-    async with get_vertex_ai_client(MODEL_LOCATION) as client:
-        with open(OUTPUT_FILE, "a", encoding="utf-8") as out_file:
-            tasks = [
-                _process_sample(
-                    sample, client, semaphore, out_file, lock, counter, total
-                )
-                for sample in pending
-            ]
-            await asyncio.gather(*tasks)
-
-    print(f"\nDone! Saved to {OUTPUT_FILE}")
+    print(f"\nDone! {counter} rows saved to {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":
