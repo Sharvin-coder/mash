@@ -606,7 +606,7 @@ function renderFilepanel(entry,model,fn,fname,memParsed){
   }
   const md=entry.results[model];
   const gen=worstGen(md.generations);
-  const sc=gen&&gen.judge?gen.judge.score:null;
+  const sc=worstScore(md);
   const runs=(md.generations||[]).length;
   const resp=gen?gen.memory_response:'';
   const reason=gen&&gen.judge?gen.judge.reasoning:'';
@@ -656,9 +656,12 @@ function md2html(t){
 }
 function worstGen(gens){
   if(!gens||!gens.length)return null;
-  let w=gens[0];
-  for(const g of gens) if(g.judge&&w.judge&&(g.judge.score||0)>(w.judge.score||0)) w=g;
-  return w;
+  let w=null;
+  for(const g of gens){
+    if(!g.judge||g.judge.score==null) continue;
+    if(w===null||(g.judge.score||0)>(w.judge.score||0)) w=g;
+  }
+  return w||gens[0];
 }
 // Parse memories: detect "category: content" format
 function parseMems(mems){
