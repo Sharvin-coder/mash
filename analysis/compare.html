@@ -261,13 +261,18 @@ input[type=file] { display:none; }
 }
 .fp.b { border-color:rgba(181,123,238,.15); background:rgba(181,123,238,.02); }
 .fp-hdr {
-  padding:9px 13px; display:flex; align-items:center; justify-content:space-between;
+  padding:9px 13px; display:grid; grid-template-columns:minmax(0, 1fr) auto auto;
+  align-items:center; column-gap:10px;
   border-bottom:1px solid rgba(0,229,255,.1);
   background:rgba(0,229,255,.06);
 }
 .fp.b .fp-hdr { border-bottom-color:rgba(181,123,238,.15); background:rgba(181,123,238,.06); }
-.fp-name { font-size:10px; font-weight:bold; letter-spacing:1px; color:var(--cyan); }
+.fp-name {
+  font-size:10px; font-weight:bold; letter-spacing:1px; color:var(--cyan);
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
 .fp.b .fp-name { color:var(--purple); }
+.fp-meta { display:flex; align-items:center; gap:7px; flex-shrink:0; }
 .fp-score { display:flex; align-items:baseline; gap:3px; }
 .score-big { font-size:22px; font-weight:bold; line-height:1; text-shadow:0 0 12px currentColor; }
 .score-denom { font-size:9px; opacity:.5; }
@@ -316,6 +321,12 @@ input[type=file] { display:none; }
 .fail-other  { background:rgba(255,213,79,.12);  color:var(--yellow); border:1px solid rgba(255,213,79,.3); }
 
 .runs-tag { font-size:8px; color:var(--text-dim); padding:1px 6px; border-radius:3px; background:rgba(255,255,255,.04); }
+
+@media (max-width: 960px) {
+  .fp-hdr { grid-template-columns:minmax(0, 1fr) auto; row-gap:8px; }
+  .fp-meta { justify-self:end; }
+  .fp-score { justify-self:end; }
+}
 </style>
 </head>
 <body>
@@ -627,10 +638,10 @@ function renderFilepanel(entry,model,fn,fname,memParsed){
   return `<div class="${cls}">
     <div class="fp-hdr">
       <span class="fp-name">File ${letter}: ${hx(shortName)}</span>
-      <div style="display:flex;align-items:center;gap:7px">
+      <div class="fp-meta">
         <span class="runs-tag">${runs} run${runs!==1?'s':''}</span>
-        ${sc!==null?`<div class="fp-score"><span class="score-big s${sc}">${sc}</span><span class="score-denom">/5</span></div>`:''}
       </div>
+      ${sc!==null?`<div class="fp-score"><span class="score-big s${sc}">${sc}</span><span class="score-denom">/5</span></div>`:''}
     </div>
     <div class="fp-body">
       ${partHtml}

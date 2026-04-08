@@ -75,10 +75,10 @@ class LabelingConfig:
     model_name: str = "google/gemini-2.5-flash"
     provider: str = "openrouter"
     samples_per_persona: int = 10
-    concurrency: int = 10
-    temperature: float = 0.7
-    checkpoint_path: Path = field(default_factory=lambda: Path("outputs/cim_labeling_checkpoint.json"))
-    output_path: Path = field(default_factory=lambda: Path("outputs/cim_labels.json"))
+    concurrency: int = 50
+    temperature: float = 0
+    checkpoint_path: Path = field(default_factory=lambda: Path("outputs/CIM/cim_labeling_checkpoint.json"))
+    output_path: Path = field(default_factory=lambda: Path("outputs/CIM/cim_labels.json"))
     split: str = "test"
 
 
