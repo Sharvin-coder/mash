@@ -265,17 +265,18 @@ async def main_async() -> int:
 
             Example:
               benchmark cim-label
-              benchmark cim-label --model google/gemini-2.5-flash --concurrency 20
+              benchmark cim-label --model DeepSeek-V3.2-3 --provider azure --concurrency 20
+              benchmark cim-label --limit 25
               benchmark cim-label --aggregate-only
         """),
     )
     cim_label_parser.add_argument(
-        "--model", default="google/gemini-2.5-flash",
-        help="Model for labeling (default: google/gemini-2.5-flash)",
+        "--model", default="DeepSeek-V3.2-3",
+        help="Model for labeling (default: DeepSeek-V3.2-3)",
     )
     cim_label_parser.add_argument(
-        "--provider", choices=["openrouter", "gemini", "vertexai_oss", "vertexai"], default="openrouter",
-        help="Provider for labeling model (default: openrouter)",
+        "--provider", choices=["openrouter", "gemini", "vertexai_oss", "vertexai", "azure"], default="azure",
+        help="Provider for labeling model (default: azure)",
     )
     cim_label_parser.add_argument(
         "--concurrency", type=int, default=10,
@@ -284,6 +285,10 @@ async def main_async() -> int:
     cim_label_parser.add_argument(
         "--samples", type=int, default=10,
         help="Samples per persona (default: 10)",
+    )
+    cim_label_parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Limit labeling to the first N CIM groups/samples",
     )
     cim_label_parser.add_argument(
         "--output", default="outputs/cim_labels.json",
@@ -346,6 +351,7 @@ async def main_async() -> int:
             samples_per_persona=args.samples,
             concurrency=args.concurrency,
             temperature=args.temperature,
+            limit=args.limit,
             checkpoint_path=Path(args.checkpoint),
             output_path=Path(args.output),
         )
